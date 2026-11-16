@@ -36,46 +36,56 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: Cell[][]
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-        <span className="label">
-          {view.length.toLocaleString()} × {columns.length}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-rule px-4 py-2.5">
+        <span className="text-[13px] tabular-nums text-pencil">
+          {view.length.toLocaleString()} rows, {columns.length} columns
         </span>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="filter…"
-          className="w-36 rounded-md border border-line-2 bg-ink-2 px-2 py-1 font-mono text-xs outline-none focus:border-lime"
-        />
+        <label className="flex items-center gap-2 text-[13px] text-pencil">
+          <span className="sr-only">Filter rows</span>
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Filter rows"
+            className="field !min-h-[36px] w-44 !py-1.5 !text-[14px]"
+          />
+        </label>
       </div>
-      <div className="max-h-[520px] overflow-auto">
-        <table className="w-full border-collapse font-mono text-[12.5px]">
-          <thead className="sticky top-0 bg-panel">
+      <div className="max-h-[560px] overflow-auto">
+        <table className="w-full border-collapse text-[14px]">
+          <thead className="sticky top-0 bg-sheet">
             <tr>
               {columns.map((c, i) => (
                 <th
                   key={i}
-                  onClick={() => setSort((s) => (s?.col === i ? (s.dir === 1 ? { col: i, dir: -1 } : null) : { col: i, dir: 1 }))}
-                  className={`cursor-pointer select-none whitespace-nowrap border-b border-line px-3 py-2 font-medium text-muted hover:text-fg ${
-                    numeric[i] ? "text-right" : "text-left"
-                  }`}
+                  scope="col"
+                  aria-sort={sort?.col === i ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
+                  className={`border-b border-ink whitespace-nowrap px-3 py-2 font-semibold ${numeric[i] ? "text-right" : "text-left"}`}
                 >
-                  {c}
-                  {sort?.col === i ? (sort.dir === 1 ? " ↑" : " ↓") : ""}
+                  <button
+                    type="button"
+                    onClick={() => setSort((s) => (s?.col === i ? (s.dir === 1 ? { col: i, dir: -1 } : null) : { col: i, dir: 1 }))}
+                    className="hover:text-signal"
+                  >
+                    {c}
+                    <span aria-hidden className="ml-1 text-pencil">
+                      {sort?.col === i ? (sort.dir === 1 ? "▲" : "▼") : ""}
+                    </span>
+                  </button>
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {view.slice(0, limit).map((r, ri) => (
-              <tr key={ri} className="odd:bg-white/[0.015] hover:bg-white/[0.04]">
+              <tr key={ri} className="hover:bg-[color-mix(in_srgb,var(--signal)_6%,transparent)]">
                 {r.map((c, ci) => (
                   <td
                     key={ci}
-                    className={`whitespace-nowrap border-b border-line/60 px-3 py-1.5 ${numeric[ci] ? "text-right tabular-nums" : ""} ${
-                      c === null ? "text-dim" : ""
+                    className={`whitespace-nowrap border-b border-rule px-3 py-1.5 ${numeric[ci] ? "text-right tabular-nums" : ""} ${
+                      c === null ? "text-pencil" : ""
                     }`}
                   >
-                    {c === null ? "null" : typeof c === "number" && !Number.isInteger(c) ? +c.toFixed(4) : String(c)}
+                    {c === null ? "—" : typeof c === "number" && !Number.isInteger(c) ? +c.toFixed(4) : String(c)}
                   </td>
                 ))}
               </tr>
@@ -84,8 +94,8 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: Cell[][]
         </table>
       </div>
       {view.length > limit ? (
-        <button type="button" onClick={() => setLimit((l) => l + 200)} className="label w-full border-t border-line py-2 hover:text-fg">
-          show more ({view.length - limit} hidden)
+        <button type="button" onClick={() => setLimit((l) => l + 200)} className="w-full border-t border-rule py-2.5 text-[14px] font-medium text-signal hover:underline">
+          Show {Math.min(200, view.length - limit)} more rows
         </button>
       ) : null}
     </div>

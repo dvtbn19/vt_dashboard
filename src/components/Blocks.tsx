@@ -20,18 +20,14 @@ const md = new Marked({
   },
 });
 
-export function Markdown({ content }: { content: string }) {
-  return <div className="prose-lab" dangerouslySetInnerHTML={{ __html: md.parse(content) as string }} />;
-}
-
-function Caption({ text }: { text?: string }) {
-  return text ? <p className="mt-2 text-sm text-muted">{text}</p> : null;
+export function Markdown({ content, className = "" }: { content: string; className?: string }) {
+  return <div className={`prose-lab ${className}`} dangerouslySetInnerHTML={{ __html: md.parse(content) as string }} />;
 }
 
 export function Blocks({ blocks }: { blocks: Block[] }) {
   if (!blocks.length) return null;
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-8">
       {blocks.map((b, i) => (
         <BlockView key={i} block={b} />
       ))}
@@ -39,73 +35,77 @@ export function Blocks({ blocks }: { blocks: Block[] }) {
   );
 }
 
+function Caption({ text }: { text?: string }) {
+  return text ? <figcaption className="mt-2 px-1 text-[14px] text-pencil">{text}</figcaption> : null;
+}
+
 function BlockView({ block: b }: { block: Block }) {
   switch (b.type) {
     case "markdown":
-      return (
-        <section className="card p-5 sm:p-6">
-          <Markdown content={b.content} />
-        </section>
-      );
+      return <Markdown content={b.content} />;
     case "metrics":
       return (
-        <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <dl className="grid grid-cols-2 border-y border-ink sm:grid-cols-3 lg:grid-cols-4">
           {b.items.map((m, i) => (
-            <div key={i} className="card p-4">
-              <div className="label">{m.label}</div>
-              <div className="mt-2 font-mono text-2xl tabular-nums text-fg">{fmt(m.value)}</div>
+            <div key={i} className="border-b border-rule px-1 py-4 pr-4 last:border-b-0 sm:border-b-0">
+              <dt className="text-[14px] text-pencil">{m.label}</dt>
+              <dd className="mt-1 text-[26px] font-semibold leading-tight tabular-nums">
+                {i === 0 ? <mark className="mark">{fmt(m.value)}</mark> : fmt(m.value)}
+              </dd>
               {m.delta ? (
-                <div className={`mt-1 font-mono text-xs ${m.delta.trim().startsWith("-") ? "text-rose" : "text-lime"}`}>{m.delta}</div>
+                <dd className={`mt-0.5 text-[14px] font-medium tabular-nums ${m.delta.trim().startsWith("-") || m.delta.trim().startsWith("−") ? "text-redpen" : "text-signal"}`}>
+                  {m.delta}
+                </dd>
               ) : null}
             </div>
           ))}
-        </section>
+        </dl>
       );
     case "table":
       return (
-        <section className="card overflow-hidden">
+        <figure className="sheet overflow-hidden">
           <DataTable columns={b.columns} rows={b.rows} />
-          {b.caption ? <p className="border-t border-line px-4 py-2 text-sm text-muted">{b.caption}</p> : null}
-        </section>
+          {b.caption ? <figcaption className="border-t border-rule px-4 py-2.5 text-[14px] text-pencil">{b.caption}</figcaption> : null}
+        </figure>
       );
     case "plotly":
       return (
-        <section className="card p-3 sm:p-4">
+        <figure className="sheet p-2 sm:p-4">
           <PlotlyChart figure={b.figure} />
           <Caption text={b.caption} />
-        </section>
+        </figure>
       );
     case "image":
       return (
-        <figure className="card overflow-hidden p-3">
+        <figure className="sheet overflow-hidden p-2 sm:p-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={b.url} alt={b.caption ?? "analysis figure"} className="mx-auto max-h-[720px] w-auto rounded-lg bg-white" />
-          {b.caption ? <figcaption className="mt-2 px-1 text-sm text-muted">{b.caption}</figcaption> : null}
+          <img src={b.url} alt={b.caption ?? "Figure from the analysis"} className="mx-auto h-auto max-h-[760px] w-auto max-w-full rounded-[6px] bg-white" />
+          <Caption text={b.caption} />
         </figure>
       );
     case "code":
       return (
-        <section className="card overflow-hidden">
-          {b.language ? <div className="label border-b border-line px-4 py-2">{b.language}</div> : null}
-          <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-fg/90">
+        <figure className="overflow-hidden rounded-[10px] border border-rule">
+          {b.language ? <figcaption className="border-b border-rule px-4 py-2 text-[13px] text-pencil">{b.language}</figcaption> : null}
+          <pre className="overflow-x-auto bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-4 font-mono text-[13px] leading-relaxed">
             <code>{b.content}</code>
           </pre>
-        </section>
+        </figure>
       );
     case "log":
       return (
-        <details className="card overflow-hidden">
-          <summary className="label cursor-pointer px-4 py-3">log</summary>
-          <pre className="max-h-[420px] overflow-auto border-t border-line bg-ink-2 p-4 font-mono text-xs leading-relaxed text-muted">
+        <details className="overflow-hidden rounded-[10px] border border-rule">
+          <summary className="cursor-pointer px-4 py-3 text-[14px] font-medium text-pencil hover:text-ink">Show the run log</summary>
+          <pre className="max-h-[440px] overflow-auto border-t border-rule bg-[color-mix(in_srgb,var(--ink)_4%,transparent)] p-4 font-mono text-[12.5px] leading-relaxed text-pencil">
             {b.content}
           </pre>
         </details>
       );
     case "file":
       return (
-        <a href={b.url} target="_blank" rel="noopener noreferrer" className="card flex items-center justify-between gap-3 p-4 hover:border-lime">
-          <span className="font-mono text-sm">{b.name}</span>
-          <span className="label">download ↗</span>
+        <a href={b.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-[10px] border border-rule px-4 py-3 hover:border-signal">
+          <span className="truncate font-medium">{b.name}</span>
+          <span className="flex-none text-[14px] text-signal">Download</span>
         </a>
       );
     default:

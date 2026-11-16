@@ -24,8 +24,8 @@ const en = {
   logout: "Log out",
   password: "Password",
   signIn: "Sign in",
-  noReports: "No reports yet. Agents will post analyses here.",
-  noDb: "Database not connected yet — showing seed data. Connect Neon Postgres in Vercel to start receiving reports.",
+  noReports: "No reports yet. When an agent posts an analysis, it shows up here.",
+  noDb: "No database is connected, so this shows sample data only. Connect Neon Postgres in the Vercel project to start receiving reports.",
   status: "Status",
   progress: "Progress",
   reports: "Reports",
@@ -35,7 +35,7 @@ const en = {
   private: "Private",
   makePublic: "Make public",
   makePrivate: "Make private",
-  nextStep: "Next step for the agent",
+  nextStep: "Give an agent its next task",
   nextStepHint: "e.g. Add a monthly seasonality breakdown and retrain with lr=1e-4",
   send: "Queue command",
   commands: "Commands",
@@ -102,6 +102,39 @@ const dict: Record<Lang, Dict> = { en, vi };
 
 export function t(lang: Lang): Dict {
   return dict[lang];
+}
+
+export const TZ = process.env.LAB_TZ || "Australia/Sydney";
+
+/** "14:02" in William's timezone. */
+export function clock(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+}
+
+function dayKey(d: Date) {
+  return d.toLocaleDateString("en-CA", { timeZone: TZ }); // YYYY-MM-DD
+}
+
+/** "Today", "Yesterday" or "Mon 16 Nov" in William's timezone. */
+export function dayLabel(iso: string, lang: Lang) {
+  const d = new Date(iso);
+  const k = dayKey(d);
+  const today = dayKey(new Date());
+  const yest = dayKey(new Date(Date.now() - 864e5));
+  if (k === today) return lang === "vi" ? "Hôm nay" : "Today";
+  if (k === yest) return lang === "vi" ? "Hôm qua" : "Yesterday";
+  return d.toLocaleDateString(lang === "vi" ? "vi-VN" : "en-AU", { weekday: "short", day: "numeric", month: "short", timeZone: TZ });
+}
+
+export function groupByDay<T extends { created_at: string }>(items: T[], lang: Lang) {
+  const groups: { label: string; items: T[] }[] = [];
+  for (const it of items) {
+    const label = dayLabel(it.created_at, lang);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(it);
+    else groups.push({ label, items: [it] });
+  }
+  return groups;
 }
 
 export function timeAgo(iso: string, lang: Lang) {

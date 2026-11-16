@@ -1,5 +1,142 @@
 type L = { en: string; vi: string };
 
+export type Lane = 0 | 1 | 2;
+
+export type CareerItem = {
+  id: string;
+  lane: Lane;
+  start: number; // fractional year
+  end: number | null; // null = ongoing
+  short: string;
+  org: string;
+  role: L;
+  note: L;
+  kind: "work" | "study";
+};
+
+export const lanes: L[] = [
+  { en: "Business & finance", vi: "Kinh doanh & tài chính" },
+  { en: "Analysis & product", vi: "Phân tích & sản phẩm" },
+  { en: "Data & AI", vi: "Dữ liệu & AI" },
+];
+
+/** William's career as a dataset: one row per role, placed in the lane it belongs to. */
+export const career: CareerItem[] = [
+  {
+    id: "vps",
+    lane: 0,
+    start: 2019.25,
+    end: 2022.38,
+    short: "VPS",
+    org: "VPS Securities",
+    role: { en: "Investment consultant", vi: "Chuyên viên tư vấn đầu tư" },
+    note: {
+      en: "20 clients, US$5M advised. First time mining transaction data to understand behaviour.",
+      vi: "20 khách hàng, 5 triệu USD. Lần đầu khai thác dữ liệu giao dịch để hiểu hành vi.",
+    },
+    kind: "work",
+  },
+  {
+    id: "hadtech",
+    lane: 1,
+    start: 2021.75,
+    end: 2022.46,
+    short: "HADTech",
+    org: "HADTech",
+    role: { en: "Business analyst", vi: "Business analyst" },
+    note: {
+      en: "Designed a curriculum database and turned 300 survey responses into a product roadmap.",
+      vi: "Thiết kế cơ sở dữ liệu chương trình học, biến 300 phản hồi khảo sát thành lộ trình sản phẩm.",
+    },
+    kind: "work",
+  },
+  {
+    id: "vinuni",
+    lane: 1,
+    start: 2022.75,
+    end: 2023.88,
+    short: "VinUni",
+    org: "VinUniversity",
+    role: { en: "Project coordinator & BA", vi: "Điều phối dự án & BA" },
+    note: {
+      en: "Validation rules for a provincial data platform, Salesforce analytics, a benchmarking dataset.",
+      vi: "Quy tắc kiểm tra dữ liệu cho nền tảng cấp tỉnh, phân tích Salesforce, bộ dữ liệu benchmark.",
+    },
+    kind: "work",
+  },
+  {
+    id: "google",
+    lane: 2,
+    start: 2023.3,
+    end: 2023.6,
+    short: "Google",
+    org: "Google / Coursera",
+    role: { en: "Data Analytics certificate", vi: "Chứng chỉ Data Analytics" },
+    note: { en: "The decision point: learn the tools properly.", vi: "Điểm quyết định: học bài bản các công cụ." },
+    kind: "study",
+  },
+  {
+    id: "uts",
+    lane: 2,
+    start: 2024.08,
+    end: 2026.38,
+    short: "UTS",
+    org: "University of Technology Sydney",
+    role: { en: "Master of Data Science & Innovation", vi: "Thạc sĩ Data Science & Innovation" },
+    note: {
+      en: "Distinction average, merit award. Multi-agent churn model, 1B-row forecasting pipeline.",
+      vi: "Loại Distinction, giải thưởng Merit. Mô hình churn đa agent, pipeline dự báo 1 tỷ dòng.",
+    },
+    kind: "study",
+  },
+  {
+    id: "coffee",
+    lane: 0,
+    start: 2025.83,
+    end: null,
+    short: "Chef's Coffee",
+    org: "TripleEC — Chef's Coffee Gordon",
+    role: { en: "Operations manager", vi: "Quản lý vận hành" },
+    note: {
+      en: "Analytics on the shop floor: energy −11%, waste −9%, labour cost −5% of revenue.",
+      vi: "Phân tích dữ liệu ngay tại quán: điện gas −11%, lãng phí −9%, chi phí nhân công −5% doanh thu.",
+    },
+    kind: "work",
+  },
+  {
+    id: "ct",
+    lane: 2,
+    start: 2026.42,
+    end: null,
+    short: "C&T",
+    org: "C&T Financial Consulting",
+    role: { en: "Data operations officer", vi: "Data operations officer" },
+    note: {
+      en: "Validating financial records against source data, every week.",
+      vi: "Kiểm tra dữ liệu tài chính đối chiếu chứng từ gốc hằng tuần.",
+    },
+    kind: "work",
+  },
+];
+
+/** Inline segments: plain text or a highlighted number. */
+export type Seg = string | { m: string };
+
+export const impact: { en: Seg[]; vi: Seg[] }[] = [
+  {
+    en: ["At a café in Gordon I mapped every menu item to the equipment it needs and re-sequenced production. Energy costs fell ", { m: "11%" }, ", food waste ", { m: "9%" }, ", and labour cost as a share of revenue ", { m: "5%" }, "."],
+    vi: ["Tại một quán café ở Gordon, tôi đối chiếu từng món với thiết bị cần dùng rồi sắp xếp lại quy trình. Chi phí điện gas giảm ", { m: "11%" }, ", lãng phí thực phẩm giảm ", { m: "9%" }, ", chi phí nhân công trên doanh thu giảm ", { m: "5%" }, "."],
+  },
+  {
+    en: ["For my master's capstone, four AI agents scoped, modelled and explained a churn problem on their own, reaching ", { m: "0.966 AUROC" }, ". Another project trained a forecasting model over ", { m: "1B+ rows" }, " in about two minutes."],
+    vi: ["Trong đồ án tốt nghiệp thạc sĩ, bốn AI agent tự xác định, mô hình hoá và giải thích bài toán churn, đạt ", { m: "AUROC 0.966" }, ". Một dự án khác train mô hình dự báo trên ", { m: "hơn 1 tỷ dòng" }, " trong khoảng hai phút."],
+  },
+  {
+    en: ["Before that I advised ", { m: "US$5M" }, " of client money and wrote the requirements that engineers built from. I know what the data is for before I touch it."],
+    vi: ["Trước đó tôi tư vấn ", { m: "5 triệu USD" }, " tài sản khách hàng và viết yêu cầu cho đội kỹ thuật xây dựng. Tôi hiểu dữ liệu dùng để làm gì trước khi bắt tay vào xử lý."],
+  },
+];
+
 export const profile = {
   name: "Van Thang (William) Doan",
   short: "William Doan",

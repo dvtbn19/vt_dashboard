@@ -1,109 +1,184 @@
 import Link from "next/link";
 import type { Command, Project, Report } from "@/lib/db";
-import { pick, timeAgo, type Dict, type Lang } from "@/lib/i18n";
+import { clock, groupByDay, pick, timeAgo, type Dict, type Lang } from "@/lib/i18n";
 import { queueCommand, setCommandStatus } from "@/app/actions";
-import { StatusPill, VisibilityPill } from "./Status";
+import { StatusPill } from "./Status";
 
-export function ProjectCard({ p, lang, d, admin }: { p: Project; lang: Lang; d: Dict; admin: boolean }) {
+const projectName = (p: Project | undefined, slug: string, lang: Lang) =>
+  p ? pick(lang, p.title, p.title_vi).split(" — ")[0] : slug;
+
+/* ---------- Project rows (compact, for the rail) ---------- */
+
+export function ProjectList({ projects, lang, d, admin }: { projects: Project[]; lang: Lang; d: Dict; admin: boolean }) {
+  if (!projects.length) {
+    return <p className="py-4 text-[15px] text-pencil">{lang === "vi" ? "Chưa có dự án công khai." : "No public projects yet."}</p>;
+  }
   return (
-    <Link
-      href={`/lab/p/${p.slug}`}
-      className="card group relative flex flex-col gap-4 overflow-hidden p-5 transition hover:-translate-y-0.5 hover:border-line-2"
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full opacity-0 blur-3xl transition group-hover:opacity-40"
-        style={{ background: "var(--lime)" }}
-      />
-      <div className="flex items-center gap-2">
-        <StatusPill status={p.status} />
-        {admin ? <VisibilityPill isPublic={p.is_public} labels={d} /> : null}
-        <span className="ml-auto font-mono text-[11px] text-dim">{timeAgo(p.updated_at, lang)}</span>
-      </div>
-      <div>
-        <h3 className="text-lg font-semibold leading-snug">{pick(lang, p.title, p.title_vi)}</h3>
-        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-muted">{pick(lang, p.summary, p.summary_vi)}</p>
-      </div>
-      <div className="mt-auto">
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {p.tags.slice(0, 5).map((tag) => (
-            <span key={tag} className="rounded-md border border-line px-1.5 py-0.5 font-mono text-[11px] text-muted">
-              {tag}
-            </span>
-          ))}
-        </div>
-        <Progress value={p.progress} />
-      </div>
-    </Link>
+    <ul className="border-t border-ink">
+      {projects.map((p) => (
+        <li key={p.slug} className="border-b border-rule">
+          <Link href={`/lab/p/${p.slug}`} className="group block py-4">
+            <div className="flex items-start justify-between gap-3">
+              <span className="font-semibold leading-snug group-hover:text-signal">{projectName(p, p.slug, lang)}</span>
+              <StatusPill status={p.status} lang={lang} />
+            </div>
+            <p className="mt-1 line-clamp-2 text-[14px] text-pencil">{pick(lang, p.summary, p.summary_vi)}</p>
+            <div className="mt-2.5 flex items-center gap-3">
+              <Progress value={p.progress} />
+              {admin && !p.is_public ? <span className="text-[13px] text-pencil">{d.private}</span> : null}
+            </div>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 export function Progress({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
   return (
-    <div className="flex items-center gap-3">
-      <div className="h-1 flex-1 overflow-hidden rounded-full bg-line">
-        <div className="h-full rounded-full bg-lime" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    <div className="flex flex-1 items-center gap-2.5" role="img" aria-label={`${v}%`}>
+      <div className="h-[3px] flex-1 bg-rule">
+        <div className="h-full bg-ink" style={{ width: `${v}%` }} />
       </div>
-      <span className="font-mono text-[11px] tabular-nums text-muted">{value}%</span>
+      <span className="w-9 text-right text-[13px] tabular-nums text-pencil">{v}%</span>
     </div>
   );
 }
 
-export function ReportRow({ r, lang, projects, admin, d }: { r: Report; lang: Lang; projects?: Map<string, Project>; admin: boolean; d: Dict }) {
-  const p = projects?.get(r.project_slug);
+/* ---------- The log ---------- */
+
+export function ReportLog({
+  reports,
+  lang,
+  d,
+  admin,
+  projects,
+  commands,
+  showProject = true,
+}: {
+  reports: Report[];
+  lang: Lang;
+  d: Dict;
+  admin: boolean;
+  projects?: Map<string, Project>;
+  commands?: Map<string, Command>;
+  showProject?: boolean;
+}) {
+  if (!reports.length) {
+    return (
+      <div className="border-t border-ink py-10">
+        <p className="max-w-[48ch] text-pencil">{d.noReports}</p>
+        <p className="mt-2 text-[15px]">
+          <Link href="/lab/docs" className="link">
+            {lang === "vi" ? "Hướng dẫn cho agent đăng báo cáo" : "How agents post a report"}
+          </Link>
+        </p>
+      </div>
+    );
+  }
   return (
-    <Link href={`/lab/r/${r.id}`} className="group flex gap-4 border-b border-line py-4 last:border-0">
-      <div className="flex flex-col items-center pt-1">
-        <span
-          className={`dot ${r.status === "running" ? "dot-pulse" : ""}`}
-          style={{
-            background: r.status === "failed" ? "var(--rose)" : r.status === "running" ? "var(--amber)" : "var(--lime)",
-            color: r.status === "running" ? "var(--amber)" : undefined,
-          }}
-        />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] text-dim">
-          {r.agent ? <span className="text-violet">@{r.agent}</span> : null}
-          {p ? <span>→ {pick(lang, p.title, p.title_vi).split(" — ")[0]}</span> : <span>→ {r.project_slug}</span>}
-          {r.kind ? <span className="rounded border border-line px-1">{r.kind}</span> : null}
-          {admin && !r.is_public ? <span className="rounded bg-white/5 px-1">{d.private}</span> : null}
-          <span className="ml-auto">{timeAgo(r.created_at, lang)}</span>
-        </div>
-        <div className="mt-1 font-medium leading-snug group-hover:text-lime">{r.title}</div>
-        {r.summary ? <p className="mt-1 line-clamp-2 text-sm text-muted">{r.summary}</p> : null}
-      </div>
-    </Link>
+    <div className="flex flex-col gap-8">
+      {groupByDay(reports, lang).map((g) => (
+        <section key={g.label}>
+          <h3 className="border-b border-ink pb-2 text-[15px] font-semibold">{g.label}</h3>
+          <ol>
+            {g.items.map((r) => (
+              <LogEntry
+                key={r.id}
+                r={r}
+                lang={lang}
+                d={d}
+                admin={admin}
+                project={showProject ? projectName(projects?.get(r.project_slug), r.project_slug, lang) : null}
+                cmd={r.parent_command_id ? commands?.get(r.parent_command_id) : undefined}
+              />
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
   );
 }
 
-export function CommandList({ commands, lang, d, admin }: { commands: Command[]; lang: Lang; d: Dict; admin: boolean }) {
-  if (!commands.length) return <p className="py-3 text-sm text-dim">{d.noCommands}</p>;
+function LogEntry({
+  r,
+  lang,
+  d,
+  admin,
+  project,
+  cmd,
+}: {
+  r: Report;
+  lang: Lang;
+  d: Dict;
+  admin: boolean;
+  project: string | null;
+  cmd?: Command;
+}) {
+  const vi = lang === "vi";
   return (
-    <ul className="flex flex-col gap-2">
+    <li className="grid grid-cols-[52px_1fr] gap-3 border-b border-rule py-4 sm:grid-cols-[64px_1fr] sm:gap-5">
+      <time dateTime={r.created_at} className="pt-0.5 text-[14px] tabular-nums text-pencil">
+        {clock(r.created_at)}
+      </time>
+      <div className="min-w-0">
+        <Link href={`/lab/r/${r.id}`} className="text-[17px] font-semibold leading-snug hover:text-signal">
+          {r.title}
+        </Link>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[14px] text-pencil">
+          <StatusPill status={r.status} lang={lang} />
+          {r.agent ? <span className="text-signal">{r.agent}</span> : null}
+          {project ? (
+            <span>
+              {vi ? "trong" : "in"} {project}
+            </span>
+          ) : null}
+          {r.kind ? <span>{r.kind}</span> : null}
+          {admin && !r.is_public ? <span>{d.private}</span> : null}
+        </div>
+        {r.summary ? <p className="mt-1.5 line-clamp-2 max-w-[68ch] text-[15px] text-pencil">{r.summary.replace(/[*_#`>]/g, "")}</p> : null}
+        {cmd ? (
+          <p className="note mt-2.5 max-w-[60ch] text-[15px]">
+            {vi ? "Bạn đã giao: " : "You asked: "}
+            {cmd.body}
+          </p>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
+/* ---------- Commands ---------- */
+
+export function CommandList({ commands, lang, d, admin }: { commands: Command[]; lang: Lang; d: Dict; admin: boolean }) {
+  const vi = lang === "vi";
+  if (!commands.length) return <p className="py-2 text-[15px] text-pencil">{d.noCommands}</p>;
+  return (
+    <ul className="flex flex-col">
       {commands.map((c) => (
-        <li key={c.id} className="rounded-xl border border-line bg-ink-2 p-3">
-          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-dim">
-            <StatusPill status={c.status} />
-            {c.agent ? <span className="text-violet">@{c.agent}</span> : <span>@any</span>}
-            {c.project_slug ? <span>→ {c.project_slug}</span> : null}
-            <span className="ml-auto">{timeAgo(c.created_at, lang)}</span>
+        <li key={c.id} className="border-b border-rule py-3.5 last:border-b-0">
+          <p className={`note text-[16px] ${c.status === "cancelled" ? "note-red line-through decoration-1" : ""}`}>{c.body}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 pl-[14px] text-[13px] text-pencil">
+            <StatusPill status={c.status} lang={lang} />
+            <span>{c.agent ? c.agent : vi ? "agent bất kỳ" : "any agent"}</span>
+            {c.project_slug ? <span>{c.project_slug}</span> : null}
+            <span>{timeAgo(c.created_at, lang)}</span>
           </div>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{c.body}</p>
-          {c.response ? <p className="mt-2 border-l-2 border-violet pl-3 text-sm text-muted">{c.response}</p> : null}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+          {c.response ? <p className="mt-2 pl-[14px] text-[15px]">{c.response}</p> : null}
+          <div className="mt-1 flex flex-wrap items-center gap-1 pl-[6px] text-[14px]">
             {c.result_report_id ? (
-              <Link href={`/lab/r/${c.result_report_id}`} className="font-mono text-lime hover:underline">
-                {d.result} →
+              <Link href={`/lab/r/${c.result_report_id}`} className="link inline-flex min-h-[36px] items-center px-2">
+                {vi ? "Xem kết quả" : "See the result"}
               </Link>
             ) : null}
             {admin && (c.status === "pending" || c.status === "claimed") ? (
               <>
                 <form action={setCommandStatus.bind(null, c.id, "done")}>
-                  <button className="font-mono text-muted hover:text-fg">{d.markDone}</button>
+                  <button className="min-h-[36px] px-2 text-pencil hover:text-ink">{d.markDone}</button>
                 </form>
                 <form action={setCommandStatus.bind(null, c.id, "cancelled")}>
-                  <button className="font-mono text-muted hover:text-rose">{d.cancel}</button>
+                  <button className="min-h-[36px] px-2 text-pencil hover:text-redpen">{d.cancel}</button>
                 </form>
               </>
             ) : null}
@@ -114,15 +189,42 @@ export function CommandList({ commands, lang, d, admin }: { commands: Command[];
   );
 }
 
-export function CommandForm({ d, reportId, project, agent }: { d: Dict; reportId?: string; project?: string; agent?: string | null }) {
+export function CommandForm({
+  d,
+  reportId,
+  project,
+  agent,
+  projects,
+  id = "cmd",
+}: {
+  d: Dict;
+  reportId?: string;
+  project?: string;
+  agent?: string | null;
+  projects?: Project[];
+  id?: string;
+}) {
   return (
-    <form action={queueCommand} className="flex flex-col gap-2">
+    <form action={queueCommand} className="flex flex-col gap-2.5">
       {reportId ? <input type="hidden" name="report_id" value={reportId} /> : null}
       {project ? <input type="hidden" name="project" value={project} /> : null}
-      <textarea name="body" required rows={3} placeholder={d.nextStepHint} className="input resize-y" />
-      <div className="flex gap-2">
-        <input name="agent" defaultValue={agent ?? ""} placeholder={d.agentOptional} className="input max-w-[14rem] font-mono text-sm" />
-        <button className="btn btn-lime ml-auto shrink-0">{d.send} ↵</button>
+      <label htmlFor={`${id}-body`} className="text-[15px] font-semibold">
+        {d.nextStep}
+      </label>
+      <textarea id={`${id}-body`} name="body" required rows={3} placeholder={d.nextStepHint} className="field resize-y" />
+      <div className="flex flex-wrap gap-2">
+        {projects ? (
+          <select name="project" defaultValue="" aria-label="Project" className="field !w-auto min-w-0 flex-1 basis-40">
+            <option value="">{d.allProjects}</option>
+            {projects.map((p) => (
+              <option key={p.slug} value={p.slug}>
+                {p.slug}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        <input name="agent" defaultValue={agent ?? ""} placeholder={d.agentOptional} aria-label={d.agentOptional} className="field min-w-0 flex-1 basis-44" />
+        <button className="btn btn-primary flex-none">{d.send}</button>
       </div>
     </form>
   );

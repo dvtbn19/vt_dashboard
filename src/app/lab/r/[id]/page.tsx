@@ -2,16 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCommand, getProject, getReport, listCommands } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
-import { getLang, pick, t, timeAgo } from "@/lib/i18n";
+import { clock, dayLabel, getLang, pick, t, timeAgo } from "@/lib/i18n";
 import { Blocks, Markdown } from "@/components/Blocks";
 import { CommandForm, CommandList } from "@/components/LabParts";
-import { StatusPill, VisibilityPill } from "@/components/Status";
+import { StatusPill } from "@/components/Status";
 import { toggleReportPublic } from "@/app/actions";
 
 export default async function ReportPage({ params }: PageProps<"/lab/r/[id]">) {
   const { id } = await params;
   const [admin, lang] = await Promise.all([isAdmin(), getLang()]);
   const d = t(lang);
+  const vi = lang === "vi";
   const r = await getReport(id);
   if (!r) notFound();
   const p = await getProject(r.project_slug);
@@ -23,51 +24,56 @@ export default async function ReportPage({ params }: PageProps<"/lab/r/[id]">) {
   ]);
 
   return (
-    <article className="flex flex-col gap-6">
-      <Link href={`/lab/p/${r.project_slug}`} className="font-mono text-xs text-muted hover:text-fg">
-        ← {p ? pick(lang, p.title, p.title_vi) : r.project_slug}
-      </Link>
-
-      <header className="rise">
-        <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-dim">
-          <StatusPill status={r.status} />
-          {r.kind ? <span className="rounded border border-line px-1.5 py-0.5">{r.kind}</span> : null}
-          {admin ? <VisibilityPill isPublic={r.is_public} labels={d} /> : null}
-          {r.agent ? <span className="text-violet">@{r.agent}</span> : null}
-          <span title={r.created_at}>{timeAgo(r.created_at, lang)}</span>
+    <article className="mx-auto flex max-w-[960px] flex-col gap-8">
+      <header>
+        <Link href={`/lab/p/${r.project_slug}`} className="link text-[15px]">
+          {p ? pick(lang, p.title, p.title_vi).split(" — ")[0] : r.project_slug}
+        </Link>
+        <h1 className="mt-4 max-w-[30ch] text-[33px] font-bold leading-[1.12] tracking-[-0.02em] sm:text-[41px]">{r.title}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-pencil">
+          <StatusPill status={r.status} lang={lang} />
+          {r.agent ? <span className="text-signal">{r.agent}</span> : null}
+          {r.kind ? <span>{r.kind}</span> : null}
+          <time dateTime={r.created_at}>
+            {dayLabel(r.created_at, lang)}, {clock(r.created_at)}
+          </time>
           {r.updated_at !== r.created_at ? (
             <span>
-              · {d.updated} {timeAgo(r.updated_at, lang)}
+              {d.updated} {timeAgo(r.updated_at, lang)}
             </span>
           ) : null}
+          {admin ? <span>{r.is_public ? d.public : d.private}</span> : null}
         </div>
-        <h1 className="mt-3 font-serif text-3xl leading-tight sm:text-5xl">{r.title}</h1>
-        {r.summary ? (
-          <div className="mt-4 max-w-3xl text-muted">
-            <Markdown content={r.summary} />
-          </div>
+        {parent ? (
+          <p className="note mt-5 max-w-[60ch]">
+            {vi ? "Bạn đã giao: " : "You asked: "}
+            {parent.body}
+          </p>
         ) : null}
+        {r.summary ? <Markdown content={r.summary} className="mt-6 text-[19px] leading-relaxed" /> : null}
         {admin ? (
-          <form action={toggleReportPublic.bind(null, r.id)} className="mt-4">
+          <form action={toggleReportPublic.bind(null, r.id)} className="mt-6">
             <button className="btn">{r.is_public ? d.makePrivate : d.makePublic}</button>
           </form>
         ) : null}
       </header>
 
-      {parent ? (
-        <div className="rounded-xl border border-violet/30 bg-violet/5 p-4 text-sm">
-          <div className="label mb-1 text-violet">{lang === "vi" ? "Được tạo từ lệnh" : "Triggered by command"}</div>
-          <p className="whitespace-pre-wrap">{parent.body}</p>
-        </div>
-      ) : null}
-
-      <Blocks blocks={r.blocks} />
+      {r.blocks.length ? (
+        <Blocks blocks={r.blocks} />
+      ) : (
+        <p className="text-pencil">{vi ? "Báo cáo này chưa có nội dung." : "This report has no content yet."}</p>
+      )}
 
       {admin ? (
-        <section className="mt-4">
-          <h2 className="label mb-2">{d.nextStep}</h2>
-          <div className="card flex flex-col gap-4 p-4">
-            <CommandForm d={d} reportId={r.id} project={r.project_slug} agent={r.agent} />
+        <section aria-labelledby="next-h" className="mt-4 grid gap-6 border-t border-ink pt-8 md:grid-cols-[1fr_1fr] md:gap-10">
+          <div>
+            <h2 id="next-h" className="sr-only">
+              {d.nextStep}
+            </h2>
+            <CommandForm d={d} reportId={r.id} project={r.project_slug} agent={r.agent} id="rep" />
+          </div>
+          <div>
+            <h3 className="text-[15px] font-semibold">{vi ? "Lệnh tiếp theo từ báo cáo này" : "Follow-ups from this report"}</h3>
             <CommandList commands={followups} lang={lang} d={d} admin={admin} />
           </div>
         </section>

@@ -14,8 +14,8 @@ export async function setLang(lang: "en" | "vi", path: string) {
 export async function login(_prev: { error?: string } | undefined, form: FormData) {
   const pw = String(form.get("password") ?? "");
   const next = String(form.get("next") ?? "/lab");
-  if (!process.env.ADMIN_PASSWORD) return { error: "ADMIN_PASSWORD is not set on the server." };
-  if (!checkPassword(pw)) return { error: "Wrong password." };
+  if (!process.env.ADMIN_PASSWORD) return { error: "Sign-in isn't set up yet. Add ADMIN_PASSWORD in the Vercel project settings, then redeploy." };
+  if (!checkPassword(pw)) return { error: "That password doesn't match. Check it and try again." };
   (await cookies()).set(SESSION_COOKIE, makeSessionToken(), sessionCookieOptions);
   redirect(next.startsWith("/") ? next : "/lab");
 }

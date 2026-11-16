@@ -23,10 +23,10 @@ function loadPlotly(): Promise<PlotlyLike> {
       const s = document.createElement("script");
       s.src = SRC;
       s.async = true;
-      s.onload = () => (window.Plotly ? resolve(window.Plotly) : reject(new Error("Plotly failed to load")));
+      s.onload = () => (window.Plotly ? resolve(window.Plotly) : reject(new Error("The chart library didn't load.")));
       s.onerror = () => {
         loading = null;
-        reject(new Error("Plotly failed to load"));
+        reject(new Error("The chart library didn't load. Check the connection and reload the page."));
       };
       document.head.appendChild(s);
     });
@@ -34,26 +34,34 @@ function loadPlotly(): Promise<PlotlyLike> {
   return loading;
 }
 
-const darkLayout = {
-  paper_bgcolor: "rgba(0,0,0,0)",
-  plot_bgcolor: "rgba(0,0,0,0)",
-  font: { color: "#c9cedb", family: "var(--font-geist-sans), system-ui, sans-serif", size: 12 },
-  colorway: ["#c8ff3d", "#9b7bff", "#46e0ff", "#ff5c8a", "#ffb547", "#7ee7a8", "#f78fe0"],
-  xaxis: { gridcolor: "#222838", zerolinecolor: "#2e3548", linecolor: "#2e3548" },
-  yaxis: { gridcolor: "#222838", zerolinecolor: "#2e3548", linecolor: "#2e3548" },
-  margin: { l: 56, r: 20, t: 40, b: 48 },
-  legend: { bgcolor: "rgba(0,0,0,0)" },
-  hoverlabel: { bgcolor: "#11141d", bordercolor: "#2e3548", font: { color: "#eceef4" } },
-};
+/** Reads the design tokens so charts match light and dark mode. */
+function themeLayout(el: HTMLElement) {
+  const cs = getComputedStyle(el);
+  const v = (n: string) => cs.getPropertyValue(n).trim();
+  // A fresh object per axis: Plotly mutates layout axes, so sharing one leaks x's type into y.
+  const axis = () => ({ gridcolor: v("--rule"), zerolinecolor: v("--rule"), linecolor: v("--rule"), tickcolor: v("--rule") });
+  return {
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: { color: v("--ink"), family: cs.fontFamily, size: 13 },
+    colorway: [1, 2, 3, 4, 5, 6].map((i) => v(`--chart-${i}`)),
+    xaxis: axis(),
+    yaxis: axis(),
+    margin: { l: 56, r: 16, t: 40, b: 84 },
+    // Below the x-axis title, not on top of it
+    legend: { bgcolor: "rgba(0,0,0,0)", orientation: "h", x: 0, xanchor: "left", y: -0.28, yanchor: "top" },
+    hoverlabel: { bgcolor: v("--sheet"), bordercolor: v("--rule"), font: { color: v("--ink") } },
+  };
+}
 
 function merge(base: Record<string, unknown>, over: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...base };
-  for (const [k, v] of Object.entries(over ?? {})) {
+  for (const [k, val] of Object.entries(over ?? {})) {
     const b = out[k];
     out[k] =
-      v && typeof v === "object" && !Array.isArray(v) && b && typeof b === "object" && !Array.isArray(b)
-        ? merge(b as Record<string, unknown>, v as Record<string, unknown>)
-        : v;
+      val && typeof val === "object" && !Array.isArray(val) && b && typeof b === "object" && !Array.isArray(b)
+        ? merge(b as Record<string, unknown>, val as Record<string, unknown>)
+        : val;
   }
   return out;
 }
@@ -61,26 +69,38 @@ function merge(base: Record<string, unknown>, over: Record<string, unknown>): Re
 export function PlotlyChart({ figure }: { figure: { data: unknown[]; layout?: Record<string, unknown> } }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     let cancelled = false;
-    loadPlotly()
-      .then((P) => {
-        if (cancelled) return;
-        const layout = merge(darkLayout, { ...(figure.layout ?? {}), template: undefined });
-        delete layout.template;
-        layout.autosize = true;
-        return P.newPlot(el, figure.data, layout, { responsive: true, displaylogo: false });
-      })
-      .catch((e: Error) => setError(e.message));
+    const draw = () =>
+      loadPlotly()
+        .then((P) => {
+          if (cancelled) return;
+          const userLayout = { ...(figure.layout ?? {}) };
+          delete userLayout.template; // plotly's own templates fight the page theme
+          const layout = merge(themeLayout(el), userLayout);
+          layout.autosize = true;
+          return P.newPlot(el, figure.data, layout, { responsive: true, displaylogo: false }).then(() => setReady(true));
+        })
+        .catch((e: Error) => setError(e.message));
+    draw();
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", draw);
     return () => {
       cancelled = true;
+      mq.removeEventListener("change", draw);
       window.Plotly?.purge(el);
     };
   }, [figure]);
 
-  if (error) return <p className="text-sm text-rose">{error}</p>;
-  return <div ref={ref} className="min-h-[340px] w-full" />;
+  if (error) return <p className="text-[15px] text-redpen">{error}</p>;
+  return (
+    <div className="relative">
+      {!ready ? <p className="absolute inset-0 grid place-items-center text-[14px] text-pencil">Drawing chart…</p> : null}
+      <div ref={ref} className="min-h-[340px] w-full" />
+    </div>
+  );
 }

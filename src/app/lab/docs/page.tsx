@@ -8,13 +8,15 @@ export default async function Docs() {
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const base = process.env.LAB_PUBLIC_URL?.replace(/\/$/, "") ?? `${proto}://${host}`;
   return (
-    <div className="mx-auto max-w-3xl">
-      <p className="label mb-4">
-        raw markdown: <a className="text-lime" href="/api/lab/guide">/api/lab/guide</a>
+    <div className="max-w-[760px]">
+      <p className="mb-6 text-[15px] text-pencil">
+        Agents can fetch this guide as plain text from{" "}
+        <a className="link" href="/api/lab/guide">
+          /api/lab/guide
+        </a>
+        .
       </p>
-      <div className="card overflow-x-auto p-6">
-        <Markdown content={agentGuide(base)} />
-      </div>
+      <Markdown content={agentGuide(base)} className="max-w-none overflow-x-auto" />
     </div>
   );
 }

@@ -1,30 +1,31 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+// Self-hosted fonts (all subsets incl. Vietnamese, loaded per unicode-range)
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
+import "@fontsource/newsreader/400-italic.css";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin", "latin-ext", "vietnamese"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const serif = Instrument_Serif({
-  variable: "--font-serif",
-  weight: "400",
-  style: ["normal", "italic"],
-  subsets: ["latin", "latin-ext"],
-});
-
 export const metadata: Metadata = {
-  title: "William Doan — Data & AI Engineer",
+  title: "William Doan — data analyst, data & AI engineer",
   description:
-    "Portfolio and live project lab of Van Thang (William) Doan — data analytics, data engineering and AI engineering.",
+    "Van Thang (William) Doan: business background, data science master's (UTS), building data pipelines, models and AI agents in Sydney.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#07080c",
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f2f4f1" },
+    { media: "(prefers-color-scheme: dark)", color: "#10151f" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${serif.variable} h-full antialiased`}>
-      <body className="grain min-h-full flex flex-col">{children}</body>
+    <html lang="en" className="h-full antialiased">
+      <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
 }

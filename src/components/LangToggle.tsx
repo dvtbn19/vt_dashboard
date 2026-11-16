@@ -8,23 +8,20 @@ export function LangToggle({ lang }: { lang: "en" | "vi" }) {
   const path = usePathname();
   const [pending, start] = useTransition();
   return (
-    <div
-      className="inline-flex rounded-full border border-line-2 p-0.5 font-mono text-[11px]"
-      aria-busy={pending}
-      role="group"
-      aria-label="Language"
-    >
-      {(["en", "vi"] as const).map((l) => (
-        <button
-          key={l}
-          type="button"
-          onClick={() => start(() => setLang(l, path))}
-          className={`rounded-full px-2.5 py-1 uppercase transition ${
-            lang === l ? "bg-fg text-ink" : "text-muted hover:text-fg"
-          }`}
-        >
-          {l}
-        </button>
+    <div className="inline-flex text-[14px] font-medium" aria-busy={pending} role="group" aria-label="Language / Ngôn ngữ">
+      {(["en", "vi"] as const).map((l, i) => (
+        <span key={l} className="inline-flex items-center">
+          {i ? <span aria-hidden className="mx-1 text-rule">/</span> : null}
+          <button
+            type="button"
+            lang={l}
+            aria-pressed={lang === l}
+            onClick={() => start(() => setLang(l, path))}
+            className={`min-h-[36px] px-1 ${lang === l ? "text-ink underline decoration-2 underline-offset-4" : "text-pencil hover:text-ink"}`}
+          >
+            {l === "en" ? "EN" : "VI"}
+          </button>
+        </span>
       ))}
     </div>
   );

@@ -1,36 +1,24 @@
-# vt_dashboard
+# VTCONS Project Lab
 
-One Next.js app, two sites:
+Personal portfolio + private data/AI project lab. Scripts and agents publish runs, metrics and files through an authenticated API; the owner reviews them in a mobile-friendly dashboard.
 
-| Host | What |
-|---|---|
-| `william-doan.vtcons.com` | Portfolio (`/`) |
-| `lab.vtcons.com` | Project Hub + agent Lab (`/lab/*`, served at the root on this host) |
-
-On `*.vercel.app` and `localhost` both are reachable at `/` and `/lab`.
-
-## The Lab
-
-- **Projects** (public/private toggle each), **reports** posted by Claude Code agents (markdown, metrics, sortable tables, interactive Plotly charts, images, code, logs, files), and a **command inbox** where the owner queues the next instruction for an agent.
-- Agents read the contract at `GET /api/lab/guide` (also rendered at `/lab/docs`).
-- Python helper: `tools/vtlab.py` (stdlib only).
-
-## Environment variables
-
-| Name | Required | Purpose |
-|---|---|---|
-| `DATABASE_URL` | yes | Neon Postgres (added automatically by the Vercel Neon integration). Tables are created on first request. |
-| `ADMIN_PASSWORD` | yes | Owner login at `/lab/login`. |
-| `AUTH_SECRET` | recommended | Random string used to sign the session cookie (`openssl rand -base64 32`). |
-| `LAB_API_KEY` | yes | Bearer key(s) for agents; comma-separate to give each agent its own key. |
-| `BLOB_READ_WRITE_TOKEN` | optional | Vercel Blob for images/files (added by the Blob integration). Without it images are stored inline. |
-| `LAB_PUBLIC_URL` | optional | e.g. `https://lab.vtcons.com` — used in links sent to Telegram and from the portfolio. |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | optional | Ping on Telegram when an agent posts or finishes a report. |
-| `LAB_HOST`, `PORTFOLIO_HOST` | optional | Override the default hostnames. |
-
-## Develop
-
-```bash
-npm install
-npm run dev   # http://localhost:3000 and http://localhost:3000/lab
 ```
+apps/web/                 Next.js: public portfolio (/, /projects) and private lab (/lab)
+services/api/             FastAPI + SQLAlchemy + Alembic: /v1 API, auth, storage abstraction
+packages/agent_sdk/       vtcons-lab-sdk (Python): LabClient, runs, metrics, artifacts
+workflows/examples/       ecommerce_eda: synthetic-data EDA that publishes real outputs
+infra/compose/            PostgreSQL for local development
+docs/                     architecture, API contract, setup + smoke test, deployment, roadmap, plan
+```
+
+Quick start: see [docs/setup.md](docs/setup.md). Publishing from Python:
+
+```python
+from vtcons_lab import LabClient
+
+with LabClient().start_run("ecommerce-sales-analysis", name="eda", params={"seed": 42}) as run:
+    run.log_metrics({"rows": 5000})
+    run.log_artifact("correlation.png")
+```
+
+Design notes: [DESIGN.md](DESIGN.md). Project rules for coding agents: [CLAUDE.md](CLAUDE.md).

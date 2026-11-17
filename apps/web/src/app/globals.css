@@ -1,0 +1,279 @@
+@import "tailwindcss";
+@import "@fontsource/be-vietnam-pro/400.css";
+@import "@fontsource/be-vietnam-pro/500.css";
+@import "@fontsource/be-vietnam-pro/600.css";
+@import "@fontsource/be-vietnam-pro/700.css";
+
+/* Tokens — see /DESIGN.md. Light by default, dark follows the OS unless the toggle overrides it. */
+:root {
+  --bg: #f5f7f6;
+  --surface: #ffffff;
+  --sunken: #ecf0ee;
+  --line: #d6ddda;
+  --ink: #14201d;
+  --muted: #56635f;
+  --accent: #0f6e62;
+  --accent-ink: #ffffff;
+  --run: #a86200;
+  --fail: #b4361f;
+  --idle: #6b7471;
+  --lane0: #414487;
+  --lane1: #2a788e;
+  --lane2: #1e9474;
+  --v1: #440154;
+  --v2: #414487;
+  --v3: #2a788e;
+  --v4: #22a884;
+  --v5: #7ad151;
+  --v6: #fde725;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1513;
+    --surface: #141d1a;
+    --sunken: #1a2522;
+    --line: #26332f;
+    --ink: #e3ebe8;
+    --muted: #93a39e;
+    --accent: #3cc2a8;
+    --accent-ink: #06201b;
+    --run: #e3a23b;
+    --fail: #f07258;
+    --idle: #8a9692;
+    --lane0: #8a90e0;
+    --lane1: #5bb2c9;
+    --lane2: #3cc2a8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1513;
+  --surface: #141d1a;
+  --sunken: #1a2522;
+  --line: #26332f;
+  --ink: #e3ebe8;
+  --muted: #93a39e;
+  --accent: #3cc2a8;
+  --accent-ink: #06201b;
+  --run: #e3a23b;
+  --fail: #f07258;
+  --idle: #8a9692;
+  --lane0: #8a90e0;
+  --lane1: #5bb2c9;
+  --lane2: #3cc2a8;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-run: var(--run);
+  --color-fail: var(--fail);
+  --color-idle: var(--idle);
+  --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+}
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+}
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .wrap {
+    width: 100%;
+    max-width: 1120px;
+    margin-inline: auto;
+    padding-inline: 16px;
+  }
+  @media (min-width: 768px) {
+    .wrap {
+      padding-inline: 32px;
+    }
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    transition: filter 120ms;
+  }
+  .btn:hover {
+    filter: brightness(1.08);
+  }
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .btn-quiet:hover {
+    background: var(--sunken);
+    filter: none;
+  }
+  .field {
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 16px; /* no iOS zoom */
+  }
+  .field:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 0;
+    border-color: transparent;
+  }
+  .label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .hint {
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .sheet {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  .link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+  }
+  .prose-lab {
+    font-size: 15.5px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .prose-lab h1 {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 12px;
+    line-height: 1.25;
+  }
+  .prose-lab h2 {
+    font-size: 19px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+  }
+  .prose-lab h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 22px 0 8px;
+  }
+  .prose-lab p,
+  .prose-lab ul,
+  .prose-lab ol {
+    margin: 0 0 12px;
+  }
+  .prose-lab ul {
+    list-style: disc;
+    padding-left: 22px;
+  }
+  .prose-lab ol {
+    list-style: decimal;
+    padding-left: 22px;
+  }
+  .prose-lab blockquote {
+    border-left: 3px solid var(--run);
+    background: color-mix(in srgb, var(--run) 9%, transparent);
+    padding: 8px 14px;
+    margin: 0 0 14px;
+    border-radius: 0 8px 8px 0;
+  }
+  .prose-lab blockquote p {
+    margin: 0;
+  }
+  .prose-lab code {
+    font-family: var(--font-mono);
+    font-size: 0.88em;
+    background: var(--sunken);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+  .prose-lab pre {
+    background: var(--sunken);
+    padding: 12px;
+    border-radius: 10px;
+    overflow-x: auto;
+    margin: 0 0 14px;
+  }
+  .prose-lab pre code {
+    background: none;
+    padding: 0;
+  }
+  .prose-lab a {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .prose-lab table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    margin: 0 0 16px;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+  }
+  .prose-lab th,
+  .prose-lab td {
+    border-bottom: 1px solid var(--line);
+    padding: 6px 12px 6px 0;
+    text-align: left;
+    white-space: nowrap;
+  }
+  .prose-lab th {
+    font-weight: 600;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,63 +1,41 @@
-# VT Lab + portfolio — design system
+# Design system
 
-Direction **B, "mission control"** (approved 17 Nov 2026, replacing direction A "lab notebook").
-The Lab is an app William uses to watch and direct several Claude Code agents, often from his phone.
-The portfolio shares the same language so the two read as one product.
+Brief (CLAUDE.md §9): a Data/AI engineer's portfolio that tells a story about engineering work, and a private lab tuned for scanning project status, runs, metrics and files — on a phone as much as on a laptop. Not a generic admin template.
 
-## Principles
+## Idea
 
-1. **Glanceable first.** The overview answers "what's running, what's waiting, what broke" in one screen, as numbers you can tap.
-2. **The next action is always under the thumb.** On phones and tablets a bottom tab bar holds navigation, with a centre **+** that opens the task composer. On desktop the same action is the first item in the sidebar.
-3. **Agents have identity.** Each agent gets a deterministic coloured avatar (hue from its name) so it is recognisable across cards, filters and threads.
-4. **Status is colour-coded and consistent everywhere:** live teal = running or in progress (pulsing dot), amber = waiting for an agent, coral = failed, hollow grey ring = done.
-5. **One container: the panel.** Radius 14, 1px hairline, no heavy shadows. Nested surfaces use `raised`, not another border.
+The one memorable element is the **career lanes chart** on the portfolio: the owner's real career drawn as a dataset, one bar per role in the lane it belongs to (business & finance → analysis & product → data & AI), coloured along the viridis ramp that data people know from matplotlib. Everything else stays quiet: hairline rules, generous whitespace, a single accent.
 
-## Tokens
+## Tokens (`apps/web/src/app/globals.css`)
 
-| Token | Dark (default) | Light | Use |
+| Token | Light | Dark | Use |
 |---|---|---|---|
-| `paper` | `#0C111D` | `#F3F5F9` | app background |
-| `sheet` | `#131A29` | `#FFFFFF` | panels |
-| `raised` | `#1A2335` | `#EEF1F6` | inputs, chips, nested blocks, hover |
-| `rule` | `#253049` | `#DDE2EC` | hairlines |
-| `ink` | `#E8EDF6` | `#111827` | text |
-| `pencil` | `#8F9BB3` | `#5B6578` | secondary text |
-| `signal` | `#7B93FF` | `#3D5AFE` | actions, links, selection, primary chart series |
-| `live` | `#2FD3BD` | `#0B8F7D` | running |
-| `warn` | `#F2B84B` | `#A8670A` | waiting |
-| `redpen` | `#FF6E5E` | `#D23C2A` | failed, destructive |
-| `marker` | `#FFE066` | `#FFE066` | highlighter behind one key number only |
+| `bg` | `#F5F7F6` | `#0E1513` | page (cool grey-green, not cream) |
+| `surface` | `#FFFFFF` | `#141D1A` | panels, inputs |
+| `sunken` | `#ECF0EE` | `#1A2522` | hover, code, table header |
+| `line` | `#D6DDDA` | `#26332F` | hairlines |
+| `ink` / `muted` | `#14201D` / `#56635F` | `#E3EBE8` / `#93A39E` | text |
+| `accent` | `#0F6E62` | `#3CC2A8` | actions, links, completed/ready (viridian) |
+| `run` | `#A86200` | `#E3A23B` | running, synthetic-data warnings |
+| `fail` | `#B4361F` | `#F07258` | failed, destructive |
+| `lane0–2` | viridis `#414487 #2A788E #1E9474` | lightened | career lanes, chart colourway |
 
-Theme: dark by default; the sun/moon button sets a `theme` cookie and `data-theme` on `<html>`. Plotly charts read the tokens and redraw when the theme changes. Chart series use `--chart-1…6`.
+Theme follows the OS; the moon/sun button stores an override in `localStorage`.
 
 ## Type
 
-- **Be Vietnam Pro** (self-hosted, full Vietnamese coverage) for everything, weights 400/500/600/700.
-- Monospace only for code and run logs.
-- Scale: 12.5 / 13 / 14 / 15 / 16 (body) / 17 / 20 / 26 / 32, display 38–64 on the portfolio hero.
-- Numbers use tabular figures (`.tnum`).
-- Sentence case. No all-caps labels.
+Be Vietnam Pro (self-hosted via @fontsource; full Vietnamese coverage) for everything, 400–700. Headline 40/56/68 px with tight tracking; body 16 px; lab labels 13–14 px. Tabular figures for every number. Monospace only for code, slugs, token prefixes and commit hashes. Sentence case, no all-caps labels.
 
 ## Layout
 
-- **≥1024px (desktop, iPad landscape):** 252px sticky sidebar (wordmark, New task, nav, language/theme/sign-in at the bottom) + content max 1200px.
-- **<1024px (phones, iPad portrait):** slim sticky top bar + fixed bottom tab bar (Overview, Reports, **+**, Commands, Projects). Content gets bottom padding for the bar and the safe area.
-- Gutters 16 / 28 / 40. Touch targets ≥ 44px; chips 38px; inputs 46px with 16px text (no iOS zoom).
-- Filter chips scroll sideways on phones and wrap on larger screens.
+- Portfolio: 1120 px column; section heads in a 240 px left column on desktop, stacked on phones.
+- Lab ≥1024 px: 240 px sidebar + content (max 1080 px). <1024 px: sticky top bar + bottom tab bar (Overview, Projects, Tokens), 56 px targets, safe-area padding.
+- Lists are rows separated by hairlines, not card grids. Panels (`.sheet`, radius 14) only for things that are a unit: a file preview, a form, the readout strip.
 
-## Components
+## Status
 
-- `StatTile`: label, big number in its status colour, one-line context; links to the filtered list.
-- `AgentCard`: avatar, name, last seen, state, current task.
-- `ReportCard`: status, project, kind, time; title; two-line summary; a **mini preview** drawn as static SVG from the first Plotly trace (line, bar or heatmap) or the first two metrics; footer with agent and the command it answered.
-- `CommandCard`: the instruction, status, agent, project, age; buttons for Mark done / Cancel / See the result.
-- `Thread` (project page): your commands as right-aligned bubbles, agent reports as cards, newest first, each with "Follow up".
-- `Composer`: a `<dialog>` that is a bottom sheet on phones and a centred modal on larger screens; prefilled from wherever it was opened; Cmd/Ctrl+Enter sends; a toast confirms.
+Always colour + shape + word: running = amber pulsing dot, completed/ready = filled viridian dot, failed = red cross, pending = hollow grey ring.
 
-## Motion
+## States
 
-Pulsing dot for live work, sheet slide-up for the composer, career-chart bars grow once on the portfolio. Everything stops under `prefers-reduced-motion`.
-
-## CSS note
-
-Component classes (`.panel`, `.btn`, `.field`, `.chip`, `.status` …) live in `@layer components` so Tailwind utilities like `hidden lg:inline-flex` can override them. After changing `globals.css`, delete `.next` before a local build; Turbopack's cache has served stale CSS before.
+Every lab page renders designed empty, loading (skeleton), API-unreachable, forbidden, not-found and session-expired states (`ProblemState`, `loading.tsx`, `/lab/login?expired=1`).

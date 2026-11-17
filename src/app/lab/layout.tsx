@@ -2,8 +2,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { isAdmin } from "@/lib/auth";
 import { getLang, t } from "@/lib/i18n";
-import { listCommands } from "@/lib/db";
+import { getTheme } from "@/lib/theme";
+import { listCommands, listProjects, listReports } from "@/lib/db";
 import { LangToggle } from "@/components/LangToggle";
+import { Composer, ComposeButton, SideNav, TabBar, ThemeToggle, type NavItem } from "@/components/LabChrome";
+import { projectName } from "@/components/LabParts";
+import { IconLogin, IconLogout, IconPlus } from "@/components/Icons";
 import { logout } from "@/app/actions";
 
 export const metadata: Metadata = {
@@ -11,69 +15,120 @@ export const metadata: Metadata = {
   description: "Analyses, charts and model results posted by William Doan's AI agents, as they happen.",
 };
 
-export default async function LabLayout({ children }: LayoutProps<"/lab">) {
-  const [admin, lang] = await Promise.all([isAdmin(), getLang()]);
-  const d = t(lang);
-  const open = admin ? (await listCommands({ status: "open", limit: 100 }).catch(() => [])).length : 0;
+function Wordmark() {
+  return (
+    <Link href="/lab" className="flex items-center gap-2.5 text-[17px] font-bold tracking-tight">
+      <span aria-hidden className="grid h-8 w-8 place-items-center rounded-[9px] bg-signal text-[13px] font-bold text-signal-ink">
+        VT
+      </span>
+      VT Lab
+    </Link>
+  );
+}
 
-  const nav = (
-    <>
-      <Link href="/lab" className="inline-flex min-h-[40px] items-center hover:text-ink">
-        {lang === "vi" ? "Nhật ký" : "Log"}
-      </Link>
-      {admin ? (
-        <Link href="/lab/inbox" className="inline-flex min-h-[40px] items-center gap-1.5 hover:text-ink">
-          {d.inbox}
-          {open ? <span className="rounded-[3px] bg-signal px-1.5 text-[12px] font-semibold leading-5 text-white">{open}</span> : null}
-        </Link>
-      ) : null}
-      <Link href="/lab/docs" className="inline-flex min-h-[40px] items-center hover:text-ink">
-        {d.docs}
-      </Link>
-    </>
+export default async function LabLayout({ children }: LayoutProps<"/lab">) {
+  const [admin, lang, theme] = await Promise.all([isAdmin(), getLang(), getTheme()]);
+  const d = t(lang);
+  const [open, projects, recent] = admin
+    ? await Promise.all([
+        listCommands({ status: "open", limit: 200 }).catch(() => []),
+        listProjects({ includePrivate: true }).catch(() => []),
+        listReports({ includePrivate: true, limit: 100 }).catch(() => []),
+      ])
+    : [[], [], []];
+
+  const items: NavItem[] = [
+    { key: "overview", href: "/lab", label: d.overview },
+    { key: "reports", href: "/lab/reports", label: d.reports },
+    ...(admin ? [{ key: "commands" as const, href: "/lab/inbox", label: d.commandsNav, badge: open.length }] : []),
+    { key: "projects", href: "/lab/projects", label: d.projects },
+  ];
+  const docs: NavItem = { key: "docs", href: "/lab/docs", label: d.docs };
+  const themeLabels = { dark: d.toDark, light: d.toLight };
+
+  const signInOut = admin ? (
+    <form action={logout}>
+      <button className="btn btn-ghost !min-h-[40px] !px-2.5" aria-label={d.logout} title={d.logout}>
+        <IconLogout size={19} />
+      </button>
+    </form>
+  ) : (
+    <Link href="/lab/login" className="btn btn-ghost !min-h-[40px] !px-2.5" aria-label={d.signIn} title={d.signIn}>
+      <IconLogin size={19} />
+    </Link>
   );
 
   return (
-    <div className="theme-auto flex min-h-screen flex-col">
-      <a href="#lab-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:bg-sheet focus:px-3 focus:py-2">
+    <div className="flex min-h-screen lg:grid lg:grid-cols-[252px_minmax(0,1fr)]">
+      <a href="#lab-main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[8px] focus:bg-sheet focus:px-3 focus:py-2">
         {lang === "vi" ? "Chuyển tới nội dung" : "Skip to content"}
       </a>
-      <header className="border-b border-rule">
-        <div className="wrap flex h-16 items-center gap-8">
-          <Link href="/lab" className="text-[19px] font-bold tracking-tight">
-            VT Lab
-          </Link>
-          <nav aria-label="Lab" className="hidden items-center gap-6 text-[15px] text-pencil md:flex">
-            {nav}
-          </nav>
-          <div className="ml-auto flex items-center gap-4">
-            <LangToggle lang={lang} />
-            {admin ? (
-              <form action={logout}>
-                <button className="min-h-[40px] text-[14px] font-medium text-pencil hover:text-ink">{d.logout}</button>
-              </form>
-            ) : (
-              <Link href="/lab/login" className="inline-flex min-h-[40px] items-center text-[14px] font-medium text-pencil hover:text-ink">
-                {d.signIn}
-              </Link>
-            )}
-          </div>
+
+      {/* Desktop and iPad landscape: sidebar */}
+      <aside className="sticky top-0 hidden h-screen flex-col gap-6 border-r border-rule bg-sheet/50 px-4 py-5 lg:flex">
+        <div className="px-1">
+          <Wordmark />
         </div>
-        <nav aria-label="Lab" className="wrap flex gap-6 overflow-x-auto border-t border-rule text-[15px] text-pencil md:hidden">
-          {nav}
-        </nav>
-      </header>
-      <main id="lab-main" className="wrap flex-1 py-8 md:py-12">
-        {children}
-      </main>
-      <footer className="border-t border-rule">
-        <div className="wrap flex flex-wrap items-center justify-between gap-2 py-6 text-[14px] text-pencil">
-          <span>{lang === "vi" ? "Các agent Claude Code của William Doan viết vào đây." : "Written by William Doan's Claude Code agents."}</span>
-          <a href="https://william-doan.vtcons.com" className="hover:text-ink">
-            {lang === "vi" ? "Về William" : "About William"}
+        {admin ? (
+          <ComposeButton className="btn btn-primary w-full">
+            <IconPlus size={18} />
+            {d.newTask}
+          </ComposeButton>
+        ) : null}
+        <SideNav items={[...items, docs]} />
+        <div className="mt-auto flex flex-col gap-3 border-t border-rule pt-4">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <LangToggle lang={lang} />
+            <div className="flex items-center">
+              <ThemeToggle theme={theme} labels={themeLabels} />
+              {signInOut}
+            </div>
+          </div>
+          <a href="https://william-doan.vtcons.com" className="px-1 text-[13px] text-pencil hover:text-ink">
+            {d.aboutWilliam}
           </a>
         </div>
-      </footer>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Phones and tablets: slim top bar */}
+        <header className="sticky top-0 z-30 border-b border-rule bg-paper/85 backdrop-blur-md lg:hidden" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+          <div className="wrap flex h-14 items-center gap-2">
+            <Wordmark />
+            <div className="ml-auto flex items-center gap-1">
+              <LangToggle lang={lang} />
+              <ThemeToggle theme={theme} labels={themeLabels} />
+              {signInOut}
+            </div>
+          </div>
+        </header>
+
+        <main id="lab-main" className="wrap pb-tabbar flex-1 pt-5 md:pt-8 lg:pt-10">
+          {children}
+        </main>
+      </div>
+
+      <TabBar items={admin ? items : [...items, docs]} composeLabel={admin ? d.newTask : undefined} />
+
+      {admin ? (
+        <Composer
+          projects={projects.map((p) => ({ slug: p.slug, name: projectName(p, p.slug, lang) }))}
+          agents={[...new Set(recent.map((r) => r.agent).filter((a): a is string => Boolean(a)))]}
+          labels={{
+            title: d.newTask,
+            hint: d.composeHint,
+            project: d.project,
+            anyProject: d.anyProject,
+            agent: d.agent,
+            anyAgent: d.anyAgent,
+            send: d.send,
+            sending: d.sending,
+            cancel: d.cancel,
+            sent: d.sent,
+            followUp: d.followUp,
+          }}
+        />
+      ) : null}
     </div>
   );
 }

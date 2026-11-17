@@ -10,9 +10,9 @@ export default async function Login({ searchParams }: PageProps<"/lab/login">) {
   const lang = await getLang();
   const d = t(lang);
   return (
-    <div className="mx-auto max-w-[400px] py-6">
-      <h1 className="text-[33px] font-bold tracking-[-0.02em]">{d.login}</h1>
-      <p className="mb-8 mt-2 text-pencil">
+    <div className="panel mx-auto mt-4 max-w-[420px] p-6 sm:mt-10 sm:p-8">
+      <h1 className="text-[26px] font-bold tracking-[-0.02em]">{d.login}</h1>
+      <p className="mb-6 mt-2 text-[15px] text-pencil">
         {lang === "vi" ? "Đăng nhập để xem mục riêng tư và giao việc cho agent." : "Sign in to see private work and give agents their next task."}
       </p>
       <LoginForm next={next} labels={d} />

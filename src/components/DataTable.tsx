@@ -46,7 +46,7 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: Cell[][]
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filter rows"
-            className="field !min-h-[36px] w-44 !py-1.5 !text-[14px]"
+            className="field !min-h-[38px] w-44 !py-1.5"
           />
         </label>
       </div>

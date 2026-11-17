@@ -11,6 +11,11 @@ export async function setLang(lang: "en" | "vi", path: string) {
   revalidatePath(path);
 }
 
+export async function setTheme(theme: "dark" | "light", path: string) {
+  (await cookies()).set("theme", theme, { path: "/", maxAge: 365 * 86400, sameSite: "lax" });
+  revalidatePath(path);
+}
+
 export async function login(_prev: { error?: string } | undefined, form: FormData) {
   const pw = String(form.get("password") ?? "");
   const next = String(form.get("next") ?? "/lab");

@@ -87,11 +87,12 @@ export function PlotlyChart({ figure }: { figure: { data: unknown[]; layout?: Re
         })
         .catch((e: Error) => setError(e.message));
     draw();
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    mq.addEventListener("change", draw);
+    // Redraw when the page theme switches (data-theme on <html>)
+    const mo = new MutationObserver(() => draw());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => {
       cancelled = true;
-      mq.removeEventListener("change", draw);
+      mo.disconnect();
       window.Plotly?.purge(el);
     };
   }, [figure]);

@@ -25,7 +25,7 @@ const en = {
   password: "Password",
   signIn: "Sign in",
   noReports: "No reports yet. When an agent posts an analysis, it shows up here.",
-  noDb: "No database is connected, so this shows sample data only. Connect Neon Postgres in the Vercel project to start receiving reports.",
+  noDb: "No database is connected yet, so reports and commands can't be saved. Connect Neon Postgres in the Vercel project, then redeploy.",
   status: "Status",
   progress: "Progress",
   reports: "Reports",
@@ -52,6 +52,33 @@ const en = {
   cancel: "Cancel",
   newProject: "New project",
   save: "Save",
+  overview: "Overview",
+  commandsNav: "Commands",
+  newTask: "New task",
+  composeHint: "What should the agent do next? e.g. Break sales down by region and retrain with lr=1e-4",
+  project: "Project",
+  anyProject: "Any project",
+  agent: "Agent",
+  anyAgent: "Any agent",
+  sending: "Sending…",
+  sent: "Task sent. The agent picks it up on its next check.",
+  followUp: "Follow up on this report",
+  toLight: "Switch to light theme",
+  toDark: "Switch to dark theme",
+  runningNow: "Running now",
+  waiting: "Waiting for an agent",
+  reportsToday: "Reports today",
+  failed24: "Failed, last 24h",
+  agentsTitle: "Agents",
+  needsAttention: "Needs attention",
+  recent: "Recent activity",
+  seeAll: "See all",
+  allStatuses: "All",
+  noMatch: "Nothing matches these filters.",
+  clearFilters: "Clear filters",
+  idle: "idle",
+  lastSeen: "last seen",
+  aboutWilliam: "About William",
 };
 
 export type Dict = Record<keyof typeof en, string>;
@@ -69,7 +96,7 @@ const vi: Dict = {
   password: "Mật khẩu",
   signIn: "Đăng nhập",
   noReports: "Chưa có báo cáo. Các agent sẽ đăng kết quả phân tích tại đây.",
-  noDb: "Chưa kết nối database — đang hiển thị dữ liệu mẫu. Hãy kết nối Neon Postgres trên Vercel để bắt đầu nhận báo cáo.",
+  noDb: "Chưa kết nối database nên chưa lưu được báo cáo và lệnh. Hãy nối Neon Postgres trong project Vercel rồi Redeploy.",
   status: "Trạng thái",
   progress: "Tiến độ",
   reports: "Báo cáo",
@@ -96,6 +123,33 @@ const vi: Dict = {
   cancel: "Huỷ",
   newProject: "Dự án mới",
   save: "Lưu",
+  overview: "Tổng quan",
+  commandsNav: "Lệnh",
+  newTask: "Giao việc",
+  composeHint: "Agent nên làm gì tiếp? VD: Chia doanh số theo vùng và train lại với lr=1e-4",
+  project: "Dự án",
+  anyProject: "Dự án bất kỳ",
+  agent: "Agent",
+  anyAgent: "Agent bất kỳ",
+  sending: "Đang gửi…",
+  sent: "Đã gửi lệnh. Agent sẽ nhận ở lần kiểm tra tới.",
+  followUp: "Giao việc tiếp từ báo cáo này",
+  toLight: "Chuyển sang nền sáng",
+  toDark: "Chuyển sang nền tối",
+  runningNow: "Đang chạy",
+  waiting: "Lệnh chờ agent",
+  reportsToday: "Báo cáo hôm nay",
+  failed24: "Lỗi trong 24 giờ",
+  agentsTitle: "Agent",
+  needsAttention: "Cần chú ý",
+  recent: "Hoạt động gần đây",
+  seeAll: "Xem tất cả",
+  allStatuses: "Tất cả",
+  noMatch: "Không có mục nào khớp bộ lọc.",
+  clearFilters: "Xoá bộ lọc",
+  idle: "rảnh",
+  lastSeen: "lần cuối",
+  aboutWilliam: "Về William",
 };
 
 const dict: Record<Lang, Dict> = { en, vi };
@@ -153,4 +207,9 @@ export function timeAgo(iso: string, lang: Lang) {
     v = Math.floor(v / step);
   }
   return "";
+}
+
+/** True when `iso` is within the last `hours` hours. */
+export function withinHours(iso: string, hours: number) {
+  return Date.now() - new Date(iso).getTime() < hours * 3600e3;
 }

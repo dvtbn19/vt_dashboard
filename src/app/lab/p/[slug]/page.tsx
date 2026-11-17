@@ -1,10 +1,12 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getProject, listCommands, listReports, type Project } from "@/lib/db";
 import { isAdmin } from "@/lib/auth";
 import { getLang, pick, t, type Dict } from "@/lib/i18n";
-import { CommandForm, CommandList, Progress, ReportLog } from "@/components/LabParts";
+import { Progress, Thread } from "@/components/LabParts";
+import { ComposeButton } from "@/components/LabChrome";
 import { StatusPill } from "@/components/Status";
+import { IconExternal, IconGlobe, IconLock, IconPlus } from "@/components/Icons";
+import { PageHead } from "@/components/PageHead";
 import { saveProject, toggleProjectPublic } from "@/app/actions";
 
 export default async function ProjectPage({ params }: PageProps<"/lab/p/[slug]">) {
@@ -12,16 +14,16 @@ export default async function ProjectPage({ params }: PageProps<"/lab/p/[slug]">
   const [admin, lang] = await Promise.all([isAdmin(), getLang()]);
   const d = t(lang);
   const vi = lang === "vi";
+  const back = { href: "/lab/projects", label: d.projects };
 
   if (slug === "new") {
     if (!admin) redirect("/lab/login?next=/lab/p/new");
     return (
-      <div className="max-w-[640px]">
-        <Link href="/lab" className="link text-[15px]">
-          {d.allProjects}
-        </Link>
-        <h1 className="mb-8 mt-4 text-[33px] font-bold tracking-[-0.02em]">{d.newProject}</h1>
-        <ProjectForm d={d} />
+      <div className="mx-auto max-w-[640px]">
+        <PageHead title={d.newProject} back={back} />
+        <div className="panel p-5 sm:p-6">
+          <ProjectForm d={d} />
+        </div>
       </div>
     );
   }
@@ -30,75 +32,100 @@ export default async function ProjectPage({ params }: PageProps<"/lab/p/[slug]">
   if (!p || (!p.is_public && !admin)) notFound();
   const [reports, commands] = await Promise.all([
     listReports({ includePrivate: admin, project: slug, limit: 100 }),
-    admin ? listCommands({ project: slug, limit: 50 }) : Promise.resolve([]),
+    admin ? listCommands({ project: slug, limit: 100 }) : Promise.resolve([]),
   ]);
-  const cmdById = new Map(commands.map((c) => [c.id, c]));
+  const running = reports.filter((r) => r.status === "running").length;
+  const open = commands.filter((c) => c.status === "pending" || c.status === "claimed").length;
 
   return (
-    <div className="flex flex-col gap-10">
-      <header className="max-w-[760px]">
-        <Link href="/lab" className="link text-[15px]">
-          {d.allProjects}
-        </Link>
-        <h1 className="mt-4 text-[33px] font-bold leading-[1.1] tracking-[-0.02em] sm:text-[41px]">{pick(lang, p.title, p.title_vi)}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-pencil">
-          <StatusPill status={p.status} lang={lang} />
-          {admin ? <span>{p.is_public ? d.public : d.private}</span> : null}
-          <span>
-            {reports.length} {vi ? "báo cáo" : reports.length === 1 ? "report" : "reports"}
-          </span>
-        </div>
-        <p className="mt-5 max-w-[64ch] text-[17px] leading-relaxed sm:text-[19px]">{pick(lang, p.summary, p.summary_vi)}</p>
-        {p.tags.length ? <p className="mt-3 text-[15px] text-pencil">{p.tags.join(", ")}</p> : null}
-        <div className="mt-5 max-w-[360px]">
-          <Progress value={p.progress} />
-        </div>
-        <div className="mt-6 flex flex-wrap gap-2.5">
-          {p.demo_url ? (
-            <a href={p.demo_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-              {d.viewDemo}
-            </a>
-          ) : null}
-          {p.repo_url ? (
-            <a href={p.repo_url} target="_blank" rel="noopener noreferrer" className="btn">
-              {d.viewRepo}
-            </a>
-          ) : null}
+    <div>
+      <PageHead
+        back={back}
+        title={pick(lang, p.title, p.title_vi)}
+        actions={
+          admin ? (
+            <ComposeButton className="btn btn-primary hidden lg:inline-flex" project={p.slug} context={pick(lang, p.title, p.title_vi)}>
+              <IconPlus size={18} />
+              {d.newTask}
+            </ComposeButton>
+          ) : null
+        }
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8">
+        <aside className="flex flex-col gap-4 lg:col-start-2 lg:row-start-1">
+          <section className="panel flex flex-col gap-4 p-5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-pencil">
+              <StatusPill status={p.status} lang={lang} />
+              {admin ? (
+                <span className="inline-flex items-center gap-1">
+                  {p.is_public ? <IconGlobe size={14} /> : <IconLock size={14} />}
+                  {p.is_public ? d.public : d.private}
+                </span>
+              ) : null}
+            </div>
+            <p className="text-[15px] leading-relaxed">{pick(lang, p.summary, p.summary_vi)}</p>
+            <Progress value={p.progress} />
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              {[
+                [reports.length, d.reports],
+                [running, vi ? "Đang chạy" : "Running"],
+                ...(admin ? [[open, vi ? "Lệnh chờ" : "Waiting"]] : []),
+              ].map(([n, label]) => (
+                <div key={String(label)} className="flex flex-col-reverse rounded-[10px] bg-raised px-2 py-2.5">
+                  <dt className="mt-1 text-[12px] text-pencil">{label}</dt>
+                  <dd className="text-[20px] font-bold leading-none tnum">{n}</dd>
+                </div>
+              ))}
+            </dl>
+            {p.tags.length ? (
+              <ul className="flex flex-wrap gap-1.5">
+                {p.tags.map((tg) => (
+                  <li key={tg} className="rounded-full bg-raised px-2.5 py-1 text-[12.5px] font-medium text-pencil">
+                    {tg}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {p.demo_url ? (
+                <a href={p.demo_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
+                  {d.viewDemo}
+                  <IconExternal size={15} />
+                </a>
+              ) : null}
+              {p.repo_url ? (
+                <a href={p.repo_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm">
+                  {d.viewRepo}
+                  <IconExternal size={15} />
+                </a>
+              ) : null}
+              {admin ? (
+                <form action={toggleProjectPublic.bind(null, p.slug)}>
+                  <button className="btn btn-sm btn-ghost">{p.is_public ? d.makePrivate : d.makePublic}</button>
+                </form>
+              ) : null}
+            </div>
+          </section>
           {admin ? (
-            <form action={toggleProjectPublic.bind(null, p.slug)}>
-              <button className="btn">{p.is_public ? d.makePrivate : d.makePublic}</button>
-            </form>
-          ) : null}
-        </div>
-      </header>
-
-      <div className="grid gap-12 lg:grid-cols-[1fr_360px] lg:gap-14">
-        <section aria-labelledby="plog-h" className="min-w-0">
-          <h2 id="plog-h" className="mb-3 text-[21px] font-semibold">
-            {vi ? "Nhật ký phân tích" : "Analysis log"}
-          </h2>
-          <ReportLog reports={reports} lang={lang} d={d} admin={admin} commands={cmdById} showProject={false} />
-        </section>
-
-        {admin ? (
-          <aside className="flex flex-col gap-8">
-            <section className="sheet p-4 sm:p-5">
-              <CommandForm d={d} project={p.slug} id="proj" />
-            </section>
-            <section aria-labelledby="pcmd-h">
-              <h2 id="pcmd-h" className="mb-1 text-[17px] font-semibold">
-                {d.commands}
-              </h2>
-              <CommandList commands={commands} lang={lang} d={d} admin={admin} />
-            </section>
-            <details className="border-t border-rule pt-4">
-              <summary className="cursor-pointer text-[15px] font-semibold hover:text-signal">{vi ? "Sửa thông tin dự án" : "Edit project details"}</summary>
+            <details className="panel group p-5">
+              <summary className="flex min-h-[28px] cursor-pointer list-none items-center justify-between text-[15px] font-semibold">
+                {vi ? "Sửa thông tin dự án" : "Edit project details"}
+                <span aria-hidden className="text-pencil transition-transform group-open:rotate-45">+</span>
+              </summary>
               <div className="mt-5">
                 <ProjectForm d={d} p={p} />
               </div>
             </details>
-          </aside>
-        ) : null}
+          ) : null}
+        </aside>
+
+        <section aria-labelledby="thread-h" className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <h2 id="thread-h" className="mb-3 text-[17px] font-semibold">
+            {vi ? "Luồng công việc" : "Work thread"}
+          </h2>
+          <Thread reports={reports} commands={commands} lang={lang} d={d} admin={admin} />
+        </section>
       </div>
     </div>
   );
@@ -106,7 +133,7 @@ export default async function ProjectPage({ params }: PageProps<"/lab/p/[slug]">
 
 function ProjectForm({ d, p }: { d: Dict; p?: Project }) {
   const row = "flex flex-col gap-1.5";
-  const lab = "text-[15px] font-medium";
+  const lab = "text-[14px] font-medium text-pencil";
   return (
     <form action={saveProject} className="flex flex-col gap-5">
       <div className={row}>

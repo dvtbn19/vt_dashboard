@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { getTheme } from "@/lib/theme";
 // Self-hosted fonts (all subsets incl. Vietnamese, loaded per unicode-range)
 import "@fontsource/be-vietnam-pro/400.css";
 import "@fontsource/be-vietnam-pro/500.css";
 import "@fontsource/be-vietnam-pro/600.css";
 import "@fontsource/be-vietnam-pro/700.css";
-import "@fontsource/newsreader/400-italic.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,15 +16,16 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f2f4f1" },
-    { media: "(prefers-color-scheme: dark)", color: "#10151f" },
-  ],
+  viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const theme = await getTheme();
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" data-theme={theme} className="h-full antialiased">
+      <head>
+        <meta name="theme-color" content={theme === "light" ? "#f3f5f9" : "#0c111d"} />
+      </head>
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );

@@ -25,7 +25,7 @@ function fmtRange(c: CareerItem, lang: "en" | "vi") {
 
 /**
  * William's career as a swimlane time-series. Bars are buttons; the selected one is
- * described underneath with a margin note. Bars grow in order on first paint.
+ * described underneath. Bars grow in order on first paint.
  */
 export function CareerChart({ lang }: { lang: "en" | "vi" }) {
   const [sel, setSel] = useState<string>("ct");
@@ -33,7 +33,7 @@ export function CareerChart({ lang }: { lang: "en" | "vi" }) {
   const order = [...career].sort((a, b) => a.start - b.start).map((c) => c.id);
 
   return (
-    <figure className="graph-paper overflow-hidden rounded-[10px] border border-rule">
+    <figure className="graph-paper overflow-hidden rounded-[16px] border border-rule">
       <figcaption className="sr-only">
         {lang === "vi" ? "Biểu đồ sự nghiệp của William từ 2019 đến nay" : "William's career from 2019 to now"}
       </figcaption>
@@ -65,7 +65,7 @@ export function CareerChart({ lang }: { lang: "en" | "vi" }) {
                       style={{ left: `${left}%`, width: `${width}%` }}
                     >
                       <span
-                        className={`grow absolute inset-0 rounded-[3px] border transition-colors ${
+                        className={`grow absolute inset-0 rounded-[6px] border transition-colors ${
                           on
                             ? "border-signal bg-signal"
                             : study
@@ -123,7 +123,7 @@ export function CareerChart({ lang }: { lang: "en" | "vi" }) {
           </p>
           <p className="text-[13px] tabular-nums text-pencil">{fmtRange(active, lang)}</p>
         </div>
-        <p className="note mt-2 max-w-[62ch]">{active.note[lang]}</p>
+        <p className="mt-1.5 max-w-[62ch] text-[15px] text-pencil">{active.note[lang]}</p>
         <p className="mt-3 text-[13px] text-pencil">
           {lang === "vi" ? "Chạm vào từng thanh để xem chi tiết." : "Select a bar to see that role."}
         </p>

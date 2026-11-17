@@ -1,106 +1,134 @@
 @import "tailwindcss";
 
-/* Tokens — see DESIGN.md */
+/* Tokens — see DESIGN.md (direction B, "mission control").
+   Dark is the default; [data-theme="light"] on <html> switches. */
 
 :root {
   --font-vn: "Be Vietnam Pro";
-  --font-note-face: "Newsreader";
-  --paper: #f2f4f1;
-  --sheet: #fbfcfa;
-  --ink: #16213a;
-  --pencil: #5f6878;
-  --rule: #d5dad3;
-  --signal: #2b59ff;
-  --redpen: #d93a26;
-  --marker: #ffe14d;
-  --marker-ink: #16213a;
-  --grid: color-mix(in srgb, var(--ink) 6%, transparent);
 
-  --chart-1: #2b59ff;
-  --chart-2: #d93a26;
-  --chart-3: #16213a;
-  --chart-4: #0f9d8a;
-  --chart-5: #7a4edb;
-  --chart-6: #c79a00;
+  /* surfaces */
+  --paper: #0c111d; /* app background */
+  --sheet: #131a29; /* panels */
+  --raised: #1a2335; /* hover, inputs, nested */
+  --rule: #253049; /* hairlines */
+  /* text */
+  --ink: #e8edf6;
+  --pencil: #8f9bb3;
+  /* roles */
+  --signal: #7b93ff; /* actions, links, selection */
+  --signal-ink: #0c111d; /* text on signal */
+  --live: #2fd3bd; /* running, in progress */
+  --warn: #f2b84b; /* waiting for an agent */
+  --redpen: #ff6e5e; /* failed, destructive */
+  --marker: #ffe066; /* highlighter, key numbers only */
+  --marker-ink: #121826;
+
+  --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --grid: color-mix(in srgb, var(--ink) 5%, transparent);
+
+  --chart-1: #7b93ff;
+  --chart-2: #2fd3bd;
+  --chart-3: #ff6e5e;
+  --chart-4: #f2b84b;
+  --chart-5: #c39bff;
+  --chart-6: #e8edf6;
+  color-scheme: dark;
 }
 
-/* The Lab follows the device's colour scheme; the portfolio stays on paper. */
-@media (prefers-color-scheme: dark) {
-  .theme-auto {
-    --paper: #10151f;
-    --sheet: #161d2a;
-    --ink: #e6eaf2;
-    --pencil: #9aa4b5;
-    --rule: #273042;
-    --signal: #7c9bff;
-    --redpen: #ff7a66;
-    --grid: color-mix(in srgb, var(--ink) 5%, transparent);
-    --chart-1: #7c9bff;
-    --chart-2: #ff7a66;
-    --chart-3: #e6eaf2;
-    --chart-4: #3fd1b9;
-    --chart-5: #b49bff;
-    --chart-6: #ffd24d;
-    color-scheme: dark;
-  }
+[data-theme="light"] {
+  --paper: #f3f5f9;
+  --sheet: #ffffff;
+  --raised: #eef1f6;
+  --rule: #dde2ec;
+  --ink: #111827;
+  --pencil: #5b6578;
+  --signal: #3d5afe;
+  --signal-ink: #ffffff;
+  --live: #0b8f7d;
+  --warn: #a8670a;
+  --redpen: #d23c2a;
+  --marker: #ffe066;
+  --shadow: 0 1px 2px rgb(17 24 39 / 0.04), 0 4px 16px -8px rgb(17 24 39 / 0.08);
+  --grid: color-mix(in srgb, var(--ink) 6%, transparent);
+
+  --chart-1: #3d5afe;
+  --chart-2: #0b8f7d;
+  --chart-3: #d23c2a;
+  --chart-4: #c27c0e;
+  --chart-5: #7a4edb;
+  --chart-6: #111827;
+  color-scheme: light;
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-sheet: var(--sheet);
+  --color-raised: var(--raised);
   --color-ink: var(--ink);
   --color-pencil: var(--pencil);
   --color-rule: var(--rule);
   --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-live: var(--live);
+  --color-warn: var(--warn);
   --color-redpen: var(--redpen);
   --color-marker: var(--marker);
   --font-sans: var(--font-vn), system-ui, sans-serif;
-  --font-note: var(--font-note-face), Georgia, serif;
 }
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--paper);
 }
 
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-vn), system-ui, sans-serif;
-  font-size: 17px;
-  line-height: 1.6;
-}
-
-.theme-auto {
-  background: var(--paper);
-  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::selection {
-  background: var(--marker);
-  color: var(--marker-ink);
+  background: color-mix(in srgb, var(--signal) 35%, transparent);
 }
 
 :focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 6px;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Layout */
 .wrap {
   width: 100%;
-  max-width: 1180px;
+  max-width: 1200px;
   margin-inline: auto;
-  padding-inline: 20px;
+  padding-inline: 16px;
 }
 @media (min-width: 768px) {
   .wrap {
-    padding-inline: 32px;
+    padding-inline: 28px;
   }
 }
 @media (min-width: 1280px) {
   .wrap {
-    padding-inline: 48px;
+    padding-inline: 40px;
+  }
+}
+
+/* Leaves room for the bottom tab bar on phones and tablets */
+.pb-tabbar {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+@media (min-width: 1024px) {
+  .pb-tabbar {
+    padding-bottom: 48px;
   }
 }
 
@@ -112,35 +140,56 @@ body {
   background-size: 24px 24px;
 }
 
+/* Component classes live in the components layer so Tailwind utilities
+   (hidden, lg:inline-flex, w-full …) can override them. */
+@layer components {
+/* Panels: the one container. Radius 14, hairline, no drop shadow in dark. */
+.panel {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+/* Kept for older markup */
+.sheet {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: 14px;
+}
+a.panel,
+button.panel {
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+a.panel:hover {
+  border-color: color-mix(in srgb, var(--signal) 55%, var(--rule));
+}
+
 /* Highlighter — only behind key numbers */
 .mark {
-  background: linear-gradient(
-    100deg,
-    transparent 0 2%,
-    var(--marker) 3% 96%,
-    transparent 97%
-  );
+  background: var(--marker);
   color: var(--marker-ink);
-  padding: 0 0.18em;
-  margin: 0 -0.05em;
-  border-radius: 0.2em 0.35em 0.25em 0.3em;
+  padding: 0 0.22em;
+  border-radius: 0.25em;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   font-variant-numeric: tabular-nums;
 }
 
-/* Margin note — Newsreader italic, the "handwritten" layer */
-.note {
-  font-family: var(--font-note-face), Georgia, serif;
-  font-style: italic;
-  font-size: 1.06em;
-  line-height: 1.5;
+/* The instruction a report answers */
+.asked {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
   color: var(--pencil);
-  border-left: 2px solid var(--signal);
-  padding-left: 0.75rem;
+  font-size: 15px;
+  line-height: 1.5;
 }
-.note-red {
-  border-left-color: var(--redpen);
+.asked > svg {
+  flex: none;
+  margin-top: 0.2rem;
+  color: var(--signal);
 }
 
 /* Controls */
@@ -150,50 +199,55 @@ body {
   justify-content: center;
   gap: 0.5rem;
   min-height: 44px;
-  padding: 0.55rem 1.05rem;
-  border-radius: 4px;
+  padding: 0.55rem 1rem;
+  border-radius: 10px;
   font-size: 15px;
   font-weight: 600;
   line-height: 1.2;
   border: 1px solid var(--rule);
   color: var(--ink);
-  background: transparent;
+  background: var(--raised);
   transition:
     background-color 0.15s,
     border-color 0.15s,
-    color 0.15s;
+    color 0.15s,
+    transform 0.1s;
   cursor: pointer;
+  white-space: nowrap;
 }
 .btn:hover {
-  border-color: var(--ink);
+  border-color: color-mix(in srgb, var(--ink) 30%, var(--rule));
+}
+.btn:active {
+  transform: scale(0.98);
 }
 .btn-primary {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
-}
-.btn-primary:hover {
   background: var(--signal);
   border-color: var(--signal);
-  color: #fff;
+  color: var(--signal-ink);
 }
-/* Buttons on the ink contact band */
-.btn-paper {
-  background: var(--paper);
-  border-color: var(--paper);
+.btn-primary:hover {
+  border-color: var(--signal);
+  background: color-mix(in srgb, var(--signal) 88%, var(--ink));
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--pencil);
+}
+.btn-ghost:hover {
   color: var(--ink);
+  background: var(--raised);
+  border-color: transparent;
 }
-.btn-paper:hover {
-  background: var(--marker);
-  border-color: var(--marker);
-  color: var(--marker-ink);
+.btn-danger:hover {
+  color: var(--redpen);
 }
-.btn-on-ink {
-  border-color: color-mix(in srgb, var(--paper) 40%, transparent);
-  color: var(--paper);
-}
-.btn-on-ink:hover {
-  border-color: var(--paper);
+.btn-sm {
+  min-height: 36px;
+  padding: 0.35rem 0.75rem;
+  font-size: 14px;
+  border-radius: 8px;
 }
 .btn:disabled {
   opacity: 0.55;
@@ -202,28 +256,22 @@ body {
 
 .field {
   width: 100%;
-  min-height: 44px;
-  background: var(--sheet);
+  min-height: 46px;
+  background: var(--raised);
   border: 1px solid var(--rule);
-  border-radius: 4px;
-  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
   font: inherit;
   font-size: 16px; /* prevents iOS zoom */
   color: var(--ink);
 }
 .field::placeholder {
-  color: color-mix(in srgb, var(--pencil) 75%, transparent);
+  color: color-mix(in srgb, var(--pencil) 80%, transparent);
 }
 .field:focus {
   outline: none;
   border-color: var(--signal);
-  box-shadow: 0 0 0 1px var(--signal);
-}
-
-.sheet {
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-radius: 10px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--signal) 25%, transparent);
 }
 
 .link {
@@ -236,62 +284,117 @@ body {
   text-decoration-thickness: 2px;
 }
 
-/* Status mark */
+/* Filter chips — scroll sideways on phones instead of wrapping into a wall */
+.chips {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: -16px;
+  padding-inline: 16px;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+@media (min-width: 768px) {
+  .chips {
+    flex-wrap: wrap;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex: none;
+  min-height: 38px;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--sheet);
+  color: var(--pencil);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.chip:hover {
+  color: var(--ink);
+}
+.chip[aria-current="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.chip .count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* Status: a coloured dot + word. Running pulses. */
 .status {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
   font-size: 13px;
-  font-weight: 500;
-  color: var(--pencil);
+  font-weight: 600;
+  color: var(--sq, var(--pencil));
   white-space: nowrap;
+  line-height: 1.2;
 }
 .status::before {
   content: "";
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 1px;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
   background: var(--sq, var(--pencil));
-  border: 1.5px solid var(--sq, var(--pencil));
 }
 .status[data-s="running"],
 .status[data-s="claimed"],
 .status[data-s="active"] {
-  --sq: var(--signal);
-  color: var(--signal);
+  --sq: var(--live);
 }
 .status[data-s="running"]::before,
 .status[data-s="claimed"]::before {
-  animation: blink 1.4s ease-in-out infinite;
+  animation: pulse 1.6s ease-out infinite;
 }
-.status[data-s="done"] {
-  --sq: var(--ink);
-  color: var(--ink);
+.status[data-s="pending"] {
+  --sq: var(--warn);
 }
 .status[data-s="failed"] {
   --sq: var(--redpen);
-  color: var(--redpen);
 }
-.status[data-s="pending"]::before {
+.status[data-s="done"] {
+  --sq: var(--pencil);
+}
+.status[data-s="done"]::before {
   background: transparent;
-  --sq: var(--signal);
+  border: 1.5px solid var(--pencil);
+  width: 0.55rem;
+  height: 0.55rem;
 }
-.status[data-s="pending"] {
-  color: var(--signal);
-}
-.status[data-s="idea"]::before,
-.status[data-s="draft"]::before,
-.status[data-s="cancelled"]::before,
-.status[data-s="paused"]::before {
-  background: transparent;
-}
-@keyframes blink {
-  50% {
-    opacity: 0.25;
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--sq) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 7px transparent;
   }
 }
 
-/* Career chart bar growth — the single orchestrated load moment */
+/* Live dot for agents */
+.live-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--live);
+  --sq: var(--live);
+  animation: pulse 1.6s ease-out infinite;
+}
+
+}
+
+/* Career chart bar growth — the single orchestrated load moment on the portfolio */
 @keyframes grow {
   from {
     transform: scaleX(0);
@@ -303,6 +406,54 @@ body {
 .grow {
   transform-origin: left center;
   animation: grow 0.7s cubic-bezier(0.3, 0.7, 0.2, 1) both;
+}
+
+/* Composer sheet */
+dialog.composer {
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 92dvh;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  background: var(--sheet);
+  color: var(--ink);
+  padding: 0;
+}
+dialog.composer[open] {
+  animation: sheet-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog.composer::backdrop {
+  background: rgb(5 8 15 / 0.6);
+  backdrop-filter: blur(2px);
+}
+@media (min-width: 768px) {
+  dialog.composer {
+    margin: auto;
+    max-width: 560px;
+    border-radius: 18px;
+    border-bottom: 1px solid var(--rule);
+  }
+  dialog.composer[open] {
+    animation: pop 0.18s ease-out;
+  }
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: scale(0.97);
+    opacity: 0;
+  }
+}
+
+.toast {
+  animation: pop 0.18s ease-out;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -317,7 +468,7 @@ body {
 /* Rendered markdown from agents */
 .prose-lab {
   line-height: 1.65;
-  max-width: 68ch;
+  max-width: 70ch;
 }
 .prose-lab > :first-child {
   margin-top: 0;
@@ -330,20 +481,20 @@ body {
   margin: 1.4em 0 0.4em;
 }
 .prose-lab h1 {
-  font-size: 1.55rem;
+  font-size: 1.45rem;
 }
 .prose-lab h2 {
-  font-size: 1.3rem;
+  font-size: 1.2rem;
 }
 .prose-lab h3 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 .prose-lab p {
-  margin: 0.65em 0;
+  margin: 0.6em 0;
 }
 .prose-lab ul,
 .prose-lab ol {
-  margin: 0.65em 0;
+  margin: 0.6em 0;
   padding-left: 1.3em;
 }
 .prose-lab ul {
@@ -353,7 +504,10 @@ body {
   list-style: decimal;
 }
 .prose-lab li {
-  margin: 0.2em 0;
+  margin: 0.25em 0;
+}
+.prose-lab li::marker {
+  color: var(--pencil);
 }
 .prose-lab a {
   color: var(--signal);
@@ -366,14 +520,14 @@ body {
 .prose-lab code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.86em;
-  background: color-mix(in srgb, var(--ink) 7%, transparent);
-  border-radius: 3px;
-  padding: 0.1em 0.3em;
+  background: var(--raised);
+  border-radius: 5px;
+  padding: 0.1em 0.35em;
 }
 .prose-lab pre {
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  background: var(--raised);
   border: 1px solid var(--rule);
-  border-radius: 6px;
+  border-radius: 10px;
   padding: 0.9rem 1rem;
   overflow-x: auto;
   max-width: 100%;
@@ -392,17 +546,15 @@ body {
 .prose-lab th,
 .prose-lab td {
   border-bottom: 1px solid var(--rule);
-  padding: 0.4em 0.75em 0.4em 0;
+  padding: 0.45em 0.8em 0.45em 0;
   text-align: left;
 }
 .prose-lab th {
   font-weight: 600;
 }
 .prose-lab blockquote {
-  font-family: var(--font-note-face), Georgia, serif;
-  font-style: italic;
   color: var(--pencil);
-  border-left: 2px solid var(--signal);
+  border-left: 3px solid var(--signal);
   padding-left: 0.85em;
 }
 .prose-lab hr {

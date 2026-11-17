@@ -80,6 +80,14 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def supabase_issuer(self) -> str:
+        """`https://<ref>.supabase.co/auth/v1`, tolerant of a pasted `/rest/v1/` or trailing slash."""
+        from urllib.parse import urlsplit
+
+        parts = urlsplit(self.supabase_url.strip())
+        return f"{parts.scheme}://{parts.netloc}/auth/v1"
+
+    @property
     def allowed_emails(self) -> set[str]:
         return {e.strip().lower() for e in self.lab_allowed_emails.split(",") if e.strip()}
 

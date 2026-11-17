@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import secrets
 import uuid
 from dataclasses import dataclass, field
@@ -25,6 +26,8 @@ from sqlalchemy.orm import Session
 from app.config import Settings, get_settings
 from app.db import get_db
 from app.models import AgentCredential, Project, User, utcnow
+
+log = logging.getLogger("vtcons.auth")
 
 AGENT_TOKEN_PREFIX = "vtl_"
 LOCAL_ISSUER = "vtcons-lab-local"
@@ -116,7 +119,7 @@ def verify_user_jwt(token: str, settings: Settings) -> dict[str, Any]:
                 issuer=LOCAL_ISSUER,
                 options={"require": ["exp", "sub"]},
             )
-        issuer = settings.supabase_url.rstrip("/") + "/auth/v1"
+        issuer = settings.supabase_issuer
         header = jwt.get_unverified_header(token)
         if header.get("alg") == "HS256":
             if not settings.supabase_jwt_secret:
@@ -133,10 +136,13 @@ def verify_user_jwt(token: str, settings: Settings) -> dict[str, Any]:
             audience=settings.supabase_jwt_audience,
             issuer=issuer,
             options={"require": ["exp", "sub"]},
+            leeway=30,
         )
     except HTTPException:
         raise
     except (jwt.PyJWTError, ValueError) as exc:
+        # Logged server-side (no token contents) so deployment problems are diagnosable.
+        log.warning("JWT rejected: %s: %s", exc.__class__.__name__, exc)
         raise _unauthorized() from exc
 
 

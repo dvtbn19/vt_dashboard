@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.config import get_settings
 from app.db import get_engine
 from app.storage import get_storage
 
@@ -36,6 +37,22 @@ def ready() -> JSONResponse:
     except Exception as exc:  # noqa: BLE001
         ok = False
         checks["storage"] = f"error: {exc.__class__.__name__}"
+    settings = get_settings()
+    if settings.auth_mode == "supabase":
+        try:
+            from app.auth import _jwks_client
+
+            keys = _jwks_client(settings.supabase_issuer + "/.well-known/jwks.json").get_signing_keys()
+            checks["auth"] = f"ok (supabase, {len(keys)} signing key(s))"
+        except Exception as exc:  # noqa: BLE001
+            # Legacy HS256 projects have no JWKS; that is fine when the secret is configured.
+            if settings.supabase_jwt_secret:
+                checks["auth"] = "ok (supabase, HS256 secret)"
+            else:
+                ok = False
+                checks["auth"] = f"error: cannot load Supabase JWKS ({exc.__class__.__name__})"
+    else:
+        checks["auth"] = "local (development only)"
     return JSONResponse(
         {"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503
     )

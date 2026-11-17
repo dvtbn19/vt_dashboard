@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.config import get_settings
 from app.routers import artifacts, auth_routes, credentials, health, projects, runs, storage_local
@@ -45,4 +46,27 @@ def create_app() -> FastAPI:
     return app
 
 
-app = create_app()
+def misconfigured_app(exc: ValidationError) -> FastAPI:
+    """Serve a clear 503 instead of crashing on import when required settings are missing/invalid.
+
+    Only setting names and validator messages are exposed, never values.
+    """
+    problems = [
+        {"setting": ".".join(str(p) for p in e.get("loc", ())) or "settings", "problem": e.get("msg", "")}
+        for e in exc.errors(include_input=False, include_url=False)
+    ]
+    fallback = FastAPI(
+        title="VTCONS Project Lab API (misconfigured)", docs_url=None, redoc_url=None, openapi_url=None
+    )
+
+    @fallback.api_route("/{path:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE"])
+    def _misconfigured(path: str) -> JSONResponse:
+        return JSONResponse({"status": "misconfigured", "problems": problems}, status_code=503)
+
+    return fallback
+
+
+try:
+    app = create_app()
+except ValidationError as _exc:  # pragma: no cover - exercised in deployment
+    app = misconfigured_app(_exc)

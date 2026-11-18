@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+import { labHref } from "@/lib/config";
 
 export function SiteHeader() {
   return (
@@ -18,7 +19,7 @@ export function SiteHeader() {
           <Link href="/#contact" className="hidden rounded-lg px-3 py-2 text-muted hover:text-ink sm:inline-block">
             Contact
           </Link>
-          <Link href="/lab" className="rounded-lg px-3 py-2 text-muted hover:text-ink">
+          <Link href={labHref()} className="rounded-lg px-3 py-2 text-muted hover:text-ink">
             Lab
           </Link>
           <ThemeToggle />

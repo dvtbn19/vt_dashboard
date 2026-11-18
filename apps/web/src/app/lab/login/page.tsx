@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { signIn } from "../actions";
 import { LoginForm } from "@/components/forms";
-import { authMode, supabaseConfig } from "@/lib/config";
+import { authMode, portfolioHref, supabaseConfig } from "@/lib/config";
 
 export const metadata: Metadata = { title: "Sign in to the lab", robots: { index: false } };
 
@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex min-h-dvh items-center justify-center px-4 py-12">
       <div className="w-full max-w-[400px]">
-        <Link href="/" className="text-[14px] text-muted hover:text-ink">
+        <Link href={portfolioHref()} className="text-[14px] text-muted hover:text-ink">
           William Doan
         </Link>
         <h1 className="mt-4 text-[28px] font-bold tracking-tight">Project Lab</h1>

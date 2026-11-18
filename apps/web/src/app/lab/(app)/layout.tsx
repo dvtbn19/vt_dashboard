@@ -4,6 +4,7 @@ import { signOut } from "../actions";
 import { BottomNav, SideNav } from "@/components/LabNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
+import { portfolioHref } from "@/lib/config";
 
 export const metadata: Metadata = { title: { default: "Lab", template: "%s · Lab" }, robots: { index: false } };
 
@@ -43,7 +44,7 @@ export default async function LabLayout({ children }: { children: React.ReactNod
             <SignOut />
             <ThemeToggle />
           </div>
-          <Link href="/" className="block px-3 py-2 text-[14px] text-muted hover:text-ink">
+          <Link href={portfolioHref()} className="block px-3 py-2 text-[14px] text-muted hover:text-ink">
             Public portfolio
           </Link>
         </div>

@@ -17,3 +17,20 @@ export function supabaseConfig(): { url: string; anonKey: string } | null {
 }
 
 export const LOCAL_TOKEN_COOKIE = "lab_token";
+
+/**
+ * Optional absolute base URLs when the portfolio and the lab live on different hosts
+ * (e.g. PORTFOLIO_URL=https://william-doan.vtcons.com, LAB_URL=https://lab.vtcons.com).
+ * When unset, links stay relative and everything is served from one host (local dev).
+ */
+function base(name: "PORTFOLIO_URL" | "LAB_URL"): string {
+  return (process.env[name] || "").trim().replace(/\/$/, "");
+}
+
+export function portfolioHref(path = "/"): string {
+  return base("PORTFOLIO_URL") + path;
+}
+
+export function labHref(path = "/lab"): string {
+  return base("LAB_URL") + path;
+}

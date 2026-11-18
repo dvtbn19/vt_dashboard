@@ -36,7 +36,15 @@ API_URL=https://api.lab.vtcons.com
 LAB_AUTH_MODE=supabase
 NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/publishable key>
+# Optional, once both domains are attached to the same Vercel project:
+PORTFOLIO_URL=https://william-doan.vtcons.com
+LAB_URL=https://lab.vtcons.com
 ```
+
+With `LAB_URL` set, `lab.vtcons.com/` redirects to `/lab`, portfolio pages requested on the lab host
+redirect to `PORTFOLIO_URL`, and `/lab/*` on the portfolio host redirects (308) to the lab host.
+`*.vercel.app` preview hosts are not redirected. Supabase session cookies are per host, so sign in
+once on the lab host. Add `https://lab.vtcons.com` to Supabase Auth → URL Configuration.
 
 ## Order
 
@@ -45,4 +53,4 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon/publishable key>
 3. In Vercel set Root Directory `apps/web` and the env vars; then push to `main`.
 4. Sign in at `https://lab.vtcons.com/lab`, create a token, run the example with `VTCONS_LAB_URL=https://api.lab.vtcons.com`.
 
-Not yet verified against real Supabase/R2 (no credentials were available): the JWKS verification path and R2 presigned URLs are implemented and unit-level checked only.
+Verified in production on 2026-11-18 via `vt-lab-api.vercel.app` (Supabase JWKS auth, R2 presigned upload/download, example run published). Custom domains `lab.vtcons.com` / `api.lab.vtcons.com` are pending DNS.

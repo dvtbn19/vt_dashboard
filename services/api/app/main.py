@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy.exc import DBAPIError
 
 from app.config import get_settings
 from app.routers import (
@@ -44,6 +47,16 @@ def create_app() -> FastAPI:
             for e in exc.errors()
         ]
         return JSONResponse({"detail": errors}, status_code=422)
+
+    @app.exception_handler(DBAPIError)
+    async def _db_error(request: Request, exc: DBAPIError) -> JSONResponse:
+        # Unhandled database errors: log the traceback and return the server's primary message and
+        # SQLSTATE (no parameters, no DETAIL lines) so deployment problems are visible in the UI.
+        logging.getLogger("vtcons.api").exception("Database error on %s %s", request.method, request.url.path)
+        diag = getattr(exc.orig, "diag", None)
+        primary = getattr(diag, "message_primary", None) or exc.orig.__class__.__name__
+        sqlstate = getattr(diag, "sqlstate", None) or "?"
+        return JSONResponse({"detail": f"Database error ({sqlstate}): {primary}"[:300]}, status_code=500)
 
     app.include_router(health.router)
     app.include_router(auth_routes.router)

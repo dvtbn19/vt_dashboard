@@ -9,6 +9,8 @@ const SCOPES = [
   { v: "read", l: "Read projects and runs" },
   { v: "runs:write", l: "Create runs and log metrics" },
   { v: "artifacts:write", l: "Upload files" },
+  { v: "notes:write", l: "Create and edit working notes" },
+  { v: "queries:write", l: "Save SQL queries (agents can never run SQL)" },
 ];
 
 export function TokenForm({ action, projects }: { action: Action; projects: { id: string; name: string }[] }) {

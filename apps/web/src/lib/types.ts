@@ -114,3 +114,33 @@ export const PROJECT_STATUSES: ProjectStatus[] = ["idea", "active", "paused", "c
 export function categoryLabel(v: string): string {
   return CATEGORIES.find((c) => c.value === v)?.label ?? v;
 }
+
+export type NoteListItem = {
+  id: string;
+  project_id: string;
+  title: string;
+  version: number;
+  last_edited_by: string;
+  created_at: string;
+  updated_at: string;
+};
+export type Note = NoteListItem & { body: string };
+
+export type ChartType = "bar" | "line" | "scatter";
+export type ChartSpec = { type: ChartType; x: string; y: string[] };
+
+export type SavedQueryListItem = {
+  id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  version: number;
+  last_edited_by: string;
+  created_at: string;
+  updated_at: string;
+};
+export type SavedQuery = SavedQueryListItem & { sql: string; chart: ChartSpec | null };
+
+export type Cell = string | number | boolean | null | Cell[] | { [k: string]: Cell };
+export type QueryResult = { columns: string[]; rows: Cell[][]; row_count: number; truncated: boolean; elapsed_ms: number };
+export type QueryEngine = { configured: boolean; timeout_seconds: number; max_rows: number };

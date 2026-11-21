@@ -1,0 +1,207 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { ResultView } from "./ResultView";
+import { deleteQuery, runSql, saveQuery } from "@/app/lab/workspace-actions";
+import { ago } from "@/lib/format";
+import { defaultChart, usableChart } from "@/lib/queryResult";
+import type { ChartSpec, QueryEngine, QueryResult, SavedQuery } from "@/lib/types";
+
+type Props = { projectId: string; query: SavedQuery | null; engine: QueryEngine | null };
+
+export function QueryEditor({ projectId, query, engine }: Props) {
+  const [id, setId] = useState(query?.id ?? null);
+  const [version, setVersion] = useState(query?.version ?? null);
+  const [name, setName] = useState(query?.name ?? "");
+  const [description, setDescription] = useState(query?.description ?? "");
+  const [sql, setSql] = useState(query?.sql ?? "-- One read-only query. Aggregate in SQL for big tables.\nselect current_date as today");
+  const [chart, setChart] = useState<ChartSpec | null>(query?.chart ?? null);
+  const [result, setResult] = useState<QueryResult | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [conflictVersion, setConflictVersion] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [snapshot, setSnapshot] = useState(() => JSON.stringify({ name, description, sql, chart }));
+  const dirty = JSON.stringify({ name, description, sql, chart }) !== snapshot;
+  const canRun = engine?.configured !== false;
+
+  const run = useCallback(async () => {
+    if (!sql.trim() || running) return;
+    setRunning(true);
+    setRunError(null);
+    const res = await runSql(sql, engine?.max_rows ? Math.min(engine.max_rows, 5000) : 1000);
+    setRunning(false);
+    if (res.ok) {
+      setResult(res.result);
+      setChart((c) => usableChart(c, res.result) ?? (c ? null : defaultChart(res.result)));
+    } else {
+      setRunError(res.error);
+    }
+  }, [sql, running, engine]);
+
+  const save = useCallback(
+    async (baseVersion = version) => {
+      setSaving(true);
+      setSaveMsg(null);
+      const fields = { name, description, sql, chart };
+      const res = await saveQuery(projectId, id, baseVersion, fields);
+      setSaving(false);
+      if (res.ok) {
+        setSnapshot(JSON.stringify(fields));
+        setVersion(res.version);
+        setConflictVersion(null);
+        setSaveMsg({ ok: true, text: `Saved · v${res.version} · ${ago(res.updated_at)}` });
+        if (!id) {
+          setId(res.id);
+          // Update the address without navigating, so the result and chart on screen stay.
+          window.history.replaceState(null, "", `/lab/projects/${projectId}/queries/${res.id}`);
+        }
+      } else {
+        if (res.conflict) setConflictVersion(res.conflict.current_version);
+        setSaveMsg({ ok: false, text: res.error });
+      }
+    },
+    [version, name, description, sql, chart, projectId, id],
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === "Enter") {
+        e.preventDefault();
+        void run();
+      } else if (e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void save();
+      }
+    };
+    const onLeave = (e: BeforeUnloadEvent) => {
+      if (dirty) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, [run, save, dirty]);
+
+  const onSqlKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      const el = e.currentTarget;
+      const { selectionStart: a, selectionEnd: b } = el;
+      setSql(sql.slice(0, a) + "  " + sql.slice(b));
+      requestAnimationFrame(() => el.setSelectionRange(a + 2, a + 2));
+    }
+  };
+
+  return (
+    <div>
+      <input
+        aria-label="Query name"
+        className="w-full bg-transparent text-[26px] font-bold leading-tight tracking-tight outline-none placeholder:text-muted focus-visible:outline-2"
+        value={name}
+        maxLength={200}
+        placeholder="Name this query"
+        onChange={(e) => setName(e.target.value)}
+      />
+      <textarea
+        aria-label="Description"
+        className="mt-2 w-full resize-y bg-transparent text-[15px] text-muted outline-none placeholder:text-muted/70 focus-visible:outline-2"
+        rows={2}
+        maxLength={20000}
+        value={description}
+        placeholder="What does it answer? (optional)"
+        onChange={(e) => setDescription(e.target.value)}
+      />
+
+      {engine && !engine.configured && (
+        <p role="status" className="mt-3 rounded-lg bg-run/10 px-3 py-2 text-[14.5px] text-run">
+          Running SQL is not set up yet: the API needs <code className="font-mono">ANALYTICS_DATABASE_URL</code> (a read-only database
+          user). You can still write and save queries.
+        </p>
+      )}
+
+      <label htmlFor="sql" className="label mt-4">
+        SQL <span className="hint font-normal">· read-only, one statement, {engine?.timeout_seconds ?? 20}s limit</span>
+      </label>
+      <textarea
+        id="sql"
+        className="field min-h-[260px] resize-y font-mono !text-[14px] leading-relaxed"
+        value={sql}
+        spellCheck={false}
+        autoCapitalize="off"
+        autoCorrect="off"
+        onChange={(e) => setSql(e.target.value)}
+        onKeyDown={onSqlKey}
+      />
+
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn" onClick={() => void run()} disabled={running || !canRun} aria-busy={running}>
+          {running ? "Running…" : "Run"}
+        </button>
+        <button type="button" className="btn btn-quiet" onClick={() => void save()} disabled={saving || (!dirty && !!id)}>
+          {saving ? "Saving…" : id ? "Save" : "Save query"}
+        </button>
+        <span className="hint hidden sm:inline">⌘/Ctrl+Enter to run · ⌘/Ctrl+S to save</span>
+        {saveMsg && (
+          <span role="status" className={`text-[13.5px] ${saveMsg.ok ? "text-muted" : "text-fail"}`}>
+            {saveMsg.ok && dirty ? "Unsaved changes" : saveMsg.text}
+          </span>
+        )}
+        {!saveMsg && dirty && id && <span className="text-[13.5px] text-muted">Unsaved changes</span>}
+      </div>
+      {conflictVersion !== null && (
+        <div role="alert" className="mt-3 rounded-lg border border-run/50 bg-run/10 p-3 text-[14.5px]">
+          <p className="font-semibold text-run">This query was changed elsewhere (now v{conflictVersion}).</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="btn !min-h-10" onClick={() => void save(conflictVersion)}>
+              Keep mine (overwrite)
+            </button>
+            <a className="btn btn-quiet !min-h-10" href="" target="_blank" rel="noopener">
+              Open the latest in a new tab
+            </a>
+          </div>
+        </div>
+      )}
+
+      <section className="mt-8" aria-label="Result">
+        {runError && (
+          <pre role="alert" className="whitespace-pre-wrap rounded-lg border border-fail/40 bg-fail/8 px-3 py-2 font-mono text-[13.5px] text-fail">
+            {runError}
+          </pre>
+        )}
+        {result ? (
+          <ResultView result={result} name={name || "query"} spec={chart} onSpecChange={setChart} />
+        ) : (
+          !runError && <p className="text-muted">Run the query to see results. Charts you set up here are saved with the query and shown on the dashboard.</p>
+        )}
+      </section>
+
+      {id && (
+        <div className="mt-12 border-t border-line pt-5">
+          {confirmDelete ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[14.5px]">Delete this saved query?</span>
+              <form action={deleteQuery.bind(null, id, projectId)}>
+                <button type="submit" className="btn !bg-fail">
+                  Delete
+                </button>
+              </form>
+              <button type="button" className="btn btn-quiet" onClick={() => setConfirmDelete(false)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="text-[14px] text-muted underline hover:text-fail" onClick={() => setConfirmDelete(true)}>
+              Delete query
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

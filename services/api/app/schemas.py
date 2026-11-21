@@ -23,7 +23,7 @@ ProjectStatus = Literal["idea", "active", "paused", "completed", "archived"]
 Visibility = Literal["private", "public"]
 Category = Literal["data-engineering", "data-science", "eda", "ml", "deep-learning", "ai-agent", "other"]
 ArtifactKind = Literal["image", "csv", "markdown", "plotly"]
-Scope = Literal["read", "runs:write", "artifacts:write"]
+Scope = Literal["read", "runs:write", "artifacts:write", "notes:write", "queries:write"]
 _DEFAULT_SCOPES: tuple[Scope, ...] = ("read", "runs:write", "artifacts:write")
 
 
@@ -303,6 +303,96 @@ class CredentialOut(ORM):
 
 class CredentialCreated(CredentialOut):
     token: str = Field(description="Shown once. Store it securely; it cannot be retrieved again.")
+
+
+# --- notes ----------------------------------------------------------------------
+
+NOTE_BODY_MAX = 500_000
+SQL_MAX = 100_000
+
+
+class NoteCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    body: str = Field(default="", max_length=NOTE_BODY_MAX)
+
+
+class NoteUpdate(BaseModel):
+    base_version: int = Field(ge=1, description="The version you started editing from (409 if it changed)")
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    body: str | None = Field(default=None, max_length=NOTE_BODY_MAX)
+
+
+class NoteListItem(ORM):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    title: str
+    version: int
+    last_edited_by: str
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+
+class NoteOut(NoteListItem):
+    body: str
+
+
+# --- saved queries ----------------------------------------------------------------
+
+
+class ChartSpec(BaseModel):
+    type: Literal["bar", "line", "scatter"] = "bar"
+    x: str = Field(min_length=1, max_length=200)
+    y: list[str] = Field(min_length=1, max_length=8)
+
+
+class QueryCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=20_000)
+    sql: str = Field(min_length=1, max_length=SQL_MAX)
+    chart: ChartSpec | None = None
+
+
+class QueryUpdate(BaseModel):
+    base_version: int = Field(ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=20_000)
+    sql: str | None = Field(default=None, min_length=1, max_length=SQL_MAX)
+    chart: ChartSpec | None = None
+
+
+class QueryListItem(ORM):
+    id: uuid.UUID
+    project_id: uuid.UUID
+    name: str
+    description: str
+    version: int
+    last_edited_by: str
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+
+class QueryOut(QueryListItem):
+    sql: str
+    chart: ChartSpec | None
+
+
+class QueryRun(BaseModel):
+    sql: str = Field(min_length=1, max_length=SQL_MAX)
+    max_rows: int = Field(default=1000, ge=1, le=5000)
+
+
+class QueryResult(BaseModel):
+    columns: list[str]
+    rows: list[list[Any]]
+    row_count: int
+    truncated: bool = Field(description="True when more rows existed than max_rows")
+    elapsed_ms: int
+
+
+class QueryEngineStatus(BaseModel):
+    configured: bool
+    timeout_seconds: int
+    max_rows: int
 
 
 # --- misc -----------------------------------------------------------------------

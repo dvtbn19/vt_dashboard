@@ -31,6 +31,26 @@ Auth header: `Authorization: Bearer <token>` — a user JWT (Supabase, or local 
 | GET | `/v1/credentials` | user | never returns secrets |
 | POST | `/v1/credentials` | user | `{name, project_ids:[uuid…] or ["*"], scopes, expires_in_days}` → includes `token` **once** |
 | POST | `/v1/credentials/{id}/revoke` | user | |
+| GET | `/v1/projects/{id}/notes` | user, agent `read` | list (no bodies), newest first |
+| POST | `/v1/projects/{id}/notes` | user, agent `notes:write` | `{title, body}` (Markdown); honours `Idempotency-Key` |
+| GET | `/v1/notes/{id}` | user, agent `read` | includes `body`, `version`, `last_edited_by` |
+| PATCH | `/v1/notes/{id}` | user, agent `notes:write` | `{base_version, title?, body?}`; **409** `{message, current_version}` if it changed since `base_version` |
+| DELETE | `/v1/notes/{id}` | user | |
+| GET | `/v1/projects/{id}/queries` | user, agent `read` | saved queries incl. `sql` and `chart` |
+| POST | `/v1/projects/{id}/queries` | user, agent `queries:write` | `{name, sql, description?, chart?}`; `chart = {type: bar\|line\|scatter, x, y:[…]}`; 409 on duplicate name |
+| GET / PATCH / DELETE | `/v1/queries/{id}` | read / `queries:write` / user | PATCH needs `base_version` (409 as for notes); `chart: null` clears it |
+| GET | `/v1/queries/engine` | user | `{configured, timeout_seconds, max_rows}` |
+| POST | `/v1/queries/run` | **user only** | `{sql, max_rows≤5000}` → `{columns, rows, row_count, truncated, elapsed_ms}`; 400 with the database message; 503 if `ANALYTICS_DATABASE_URL` is unset |
+| POST | `/v1/queries/{id}/run?max_rows=` | **user only** | runs a saved query |
 | GET | `/v1/public/projects`, `/v1/public/projects/{slug}` | anyone | only `visibility=public`; no ids, runs or files |
 
 Artifact states: `pending_upload → ready | failed`. Run states: `running → completed | failed`.
+
+### Running SQL (analytics queries)
+
+Queries run against `ANALYTICS_DATABASE_URL`, a database separate from the Lab's own metadata, using a
+**read-only role** (e.g. Supabase `team_ro`, SELECT on one schema). On top of that the API wraps the
+statement as `SELECT * FROM (<sql>) AS lab_query LIMIT n` (so only a single query can run), inside a
+`READ ONLY` transaction with `statement_timeout` (`QUERY_TIMEOUT_SECONDS`, default 20) that is always
+rolled back, and caps rows (`QUERY_MAX_ROWS`, default 5000) and cell size. Agent tokens can save SQL
+but never run it. Notes and saved queries use optimistic concurrency (`version` / `base_version`).

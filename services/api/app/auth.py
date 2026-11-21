@@ -36,7 +36,9 @@ LOCAL_USER_NAMESPACE = uuid.UUID("5d1c1b64-3a5c-4f8e-9a51-6f5c1f6f0a11")
 SCOPE_READ = "read"
 SCOPE_RUNS_WRITE = "runs:write"
 SCOPE_ARTIFACTS_WRITE = "artifacts:write"
-ALL_SCOPES = (SCOPE_READ, SCOPE_RUNS_WRITE, SCOPE_ARTIFACTS_WRITE)
+SCOPE_NOTES_WRITE = "notes:write"
+SCOPE_QUERIES_WRITE = "queries:write"
+ALL_SCOPES = (SCOPE_READ, SCOPE_RUNS_WRITE, SCOPE_ARTIFACTS_WRITE, SCOPE_NOTES_WRITE, SCOPE_QUERIES_WRITE)
 ALL_PROJECTS = "*"
 
 
@@ -58,6 +60,13 @@ class Principal:
     def require_scope(self, scope: str) -> None:
         if self.kind == "agent" and scope not in self.scopes:
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"Credential lacks scope '{scope}'")
+
+    @property
+    def label(self) -> str:
+        """Who made a change, for `last_edited_by`."""
+        if self.credential is not None:
+            return f"agent:{self.credential.name}"[:160]
+        return (self.user.email if self.user else "user")[:160]
 
     def can_access_project(self, project: Project) -> bool:
         if project.owner_id != self.owner_id:

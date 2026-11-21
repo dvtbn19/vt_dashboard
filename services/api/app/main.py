@@ -7,7 +7,17 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from app.config import get_settings
-from app.routers import artifacts, auth_routes, credentials, health, projects, runs, storage_local
+from app.routers import (
+    artifacts,
+    auth_routes,
+    credentials,
+    health,
+    notes,
+    projects,
+    queries,
+    runs,
+    storage_local,
+)
 
 
 def create_app() -> FastAPI:
@@ -21,7 +31,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
-        allow_methods=["GET", "POST", "PATCH", "PUT"],
+        allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
         allow_credentials=False,
     )
@@ -41,6 +51,8 @@ def create_app() -> FastAPI:
     app.include_router(runs.router)
     app.include_router(artifacts.router)
     app.include_router(credentials.router)
+    app.include_router(notes.router)
+    app.include_router(queries.router)
     if settings.storage_backend == "local":
         app.include_router(storage_local.router)
     return app

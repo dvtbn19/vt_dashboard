@@ -7,6 +7,7 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     public detail: string,
+    public body?: unknown,
   ) {
     super(`API ${status}: ${detail}`);
   }
@@ -16,14 +17,17 @@ export class ApiUnavailable extends Error {}
 
 async function parseError(res: Response): Promise<ApiError> {
   let detail = res.statusText;
+  let body: unknown;
   try {
-    const body = await res.json();
-    if (typeof body.detail === "string") detail = body.detail;
-    else if (Array.isArray(body.detail)) detail = body.detail.map((d: { msg: string }) => d.msg).join("; ");
+    body = await res.json();
+    const d = (body as { detail?: unknown }).detail;
+    if (typeof d === "string") detail = d;
+    else if (Array.isArray(d)) detail = d.map((x: { msg: string }) => x.msg).join("; ");
+    else if (d && typeof (d as { message?: unknown }).message === "string") detail = (d as { message: string }).message;
   } catch {
     /* not JSON */
   }
-  return new ApiError(res.status, detail);
+  return new ApiError(res.status, detail, body);
 }
 
 type Init = RequestInit & { token?: string | null; timeoutMs?: number };
@@ -46,7 +50,7 @@ async function send(path: string, init: Init = {}): Promise<Response> {
  * Authenticated call on behalf of the signed-in user.
  * 401 → back to the login page (session missing or expired). Other errors are thrown as ApiError.
  */
-export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function api<T>(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   const token = await getAccessToken();
   if (!token) redirect("/lab/login");
   const res = await send(path, { ...init, token });

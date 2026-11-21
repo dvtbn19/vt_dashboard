@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     r2_bucket: str = ""
     r2_endpoint_url: str = ""  # optional override; defaults to https://<account>.r2.cloudflarestorage.com
 
+    # --- analytics queries (optional) -----------------------------------------------
+    # Connection string of a READ-ONLY database role used to run SQL from the Lab
+    # (e.g. Supabase role `team_ro` limited to schema `range_review`). Empty = feature off.
+    analytics_database_url: str = ""
+    query_timeout_seconds: int = 20
+    query_max_rows: int = 5000
+
     # --- limits ---------------------------------------------------------------
     max_artifact_bytes: int = 50 * 1024 * 1024
     upload_url_ttl_seconds: int = 900

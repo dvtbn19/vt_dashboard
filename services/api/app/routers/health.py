@@ -53,6 +53,9 @@ def ready() -> JSONResponse:
                 checks["auth"] = f"error: cannot load Supabase JWKS ({exc.__class__.__name__})"
     else:
         checks["auth"] = "local (development only)"
+    from app import analytics
+
+    checks["analytics"] = analytics.check()  # optional feature: reported, never fails readiness
     return JSONResponse(
         {"status": "ok" if ok else "unavailable", "checks": checks}, status_code=200 if ok else 503
     )

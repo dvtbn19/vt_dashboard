@@ -149,3 +149,37 @@ class IdempotencyRecord(Base):
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)
     response_body: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class Note(TimestampMixin, Base):
+    """A Markdown working note attached to a project, editable in the Lab and through the API.
+
+    `version` increases on every write; updates must send the version they started from so two
+    editors (the owner in the browser, an agent through the API) never silently overwrite each other.
+    """
+
+    __tablename__ = "notes"
+    __table_args__ = (Index("ix_notes_project_updated", "project_id", "updated_at"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, default="", nullable=False)  # Markdown
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+
+
+class SavedQuery(TimestampMixin, Base):
+    """A named, read-only SQL query kept with a project and runnable from the Lab."""
+
+    __tablename__ = "saved_queries"
+    __table_args__ = (UniqueConstraint("project_id", "name", name="uq_saved_queries_project_name"),)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, default="", nullable=False)  # Markdown
+    sql: Mapped[str] = mapped_column(Text, nullable=False)
+    chart: Mapped[dict[str, Any] | None] = mapped_column(
+        JSON
+    )  # {"type": "bar"|"line", "x": col, "y": [cols]}
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)

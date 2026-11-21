@@ -1,12 +1,12 @@
 """Small client for publishing runs, metrics and artifacts to VTCONS Project Lab.
 
-    from vtcons_lab import LabClient
+from vtcons_lab import LabClient
 
-    lab = LabClient()  # reads VTCONS_LAB_URL and VTCONS_LAB_TOKEN
-    with lab.start_run("ecommerce-sales-analysis", name="eda", params={"seed": 42}) as run:
-        run.log_metric("rows", 5000)
-        run.log_artifact("correlation.png")
-    # leaving the block completes the run; an exception marks it failed (and re-raises)
+lab = LabClient()  # reads VTCONS_LAB_URL and VTCONS_LAB_TOKEN
+with lab.start_run("ecommerce-sales-analysis", name="eda", params={"seed": 42}) as run:
+    run.log_metric("rows", 5000)
+    run.log_artifact("correlation.png")
+# leaving the block completes the run; an exception marks it failed (and re-raises)
 """
 
 from __future__ import annotations
@@ -117,7 +117,9 @@ class LabClient:
             delay = max(delay, float(response.headers["Retry-After"]))
         time.sleep(min(delay, 30.0))
 
-    def _send(self, client: httpx.Client, method: str, url: str, *, retry: bool, **kwargs: Any) -> httpx.Response:
+    def _send(
+        self, client: httpx.Client, method: str, url: str, *, retry: bool, **kwargs: Any
+    ) -> httpx.Response:
         """Send a request. Only retried when `retry` (safe or idempotency-keyed operations)."""
         attempts = self.max_retries + 1 if retry else 1
         last_exc: Exception | None = None
@@ -204,12 +206,95 @@ class LabClient:
             "source": source,
         }
         data = self._call(
-            "POST", f"/v1/projects/{proj['id']}/runs", json=body, retry=True, idempotency_key=str(uuid.uuid4())
+            "POST",
+            f"/v1/projects/{proj['id']}/runs",
+            json=body,
+            retry=True,
+            idempotency_key=str(uuid.uuid4()),
         )
         return Run(self, data)
 
     def get_run(self, run_id: str) -> dict[str, Any]:
         return self._call("GET", f"/v1/runs/{run_id}", retry=True)
+
+    # ------------------------------------------------------------------ notes
+    def list_notes(self, project: str) -> list[dict[str, Any]]:
+        proj = self.get_project(project)
+        return self._call("GET", f"/v1/projects/{proj['id']}/notes", retry=True)
+
+    def get_note(self, note_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/v1/notes/{note_id}", retry=True)
+
+    def create_note(self, project: str, title: str, body: str = "") -> dict[str, Any]:
+        """Create a working note (needs the `notes:write` scope)."""
+        proj = self.get_project(project)
+        return self._call(
+            "POST",
+            f"/v1/projects/{proj['id']}/notes",
+            json={"title": title, "body": body},
+            retry=True,
+            idempotency_key=str(uuid.uuid4()),
+        )
+
+    def update_note(
+        self, note_id: str, base_version: int, *, title: str | None = None, body: str | None = None
+    ) -> dict[str, Any]:
+        """Update a note you read at `base_version`. Raises LabError(status=409) if it changed since:
+        the owner may be editing it in the Lab, so re-read it instead of overwriting."""
+        payload: dict[str, Any] = {"base_version": base_version}
+        if title is not None:
+            payload["title"] = title
+        if body is not None:
+            payload["body"] = body
+        return self._call("PATCH", f"/v1/notes/{note_id}", json=payload)
+
+    def publish_note(self, project: str, title: str, body: str) -> dict[str, Any]:
+        """Create the note `title` if the project has none with that title; otherwise leave the
+        existing one untouched (it may contain the owner's edits) and return it."""
+        for note in self.list_notes(project):
+            if note["title"] == title:
+                return self.get_note(note["id"])
+        return self.create_note(project, title, body)
+
+    # ------------------------------------------------------------------ saved queries
+    def list_queries(self, project: str) -> list[dict[str, Any]]:
+        proj = self.get_project(project)
+        return self._call("GET", f"/v1/projects/{proj['id']}/queries", retry=True)
+
+    def save_query(
+        self,
+        project: str,
+        name: str,
+        sql: str,
+        *,
+        description: str = "",
+        chart: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Create or update the saved query `name` (needs `queries:write`).
+
+        `chart` is optional: {"type": "bar"|"line"|"scatter", "x": "<column>", "y": ["<column>", ...]}.
+        Queries with a chart appear on the project's dashboard. Agents can save SQL but never run it.
+        """
+        proj = self.get_project(project)
+        body: dict[str, Any] = {"name": name, "sql": sql, "description": description, "chart": chart}
+        for q in self._call("GET", f"/v1/projects/{proj['id']}/queries", retry=True):
+            if q["name"] == name:
+                if (
+                    q["sql"] == sql
+                    and q["description"] == description
+                    and q.get("chart") == (dict(chart) if chart else None)
+                ):
+                    return q
+                return self._call(
+                    "PATCH", f"/v1/queries/{q['id']}", json={**body, "base_version": q["version"]}
+                )
+        return self._call(
+            "POST",
+            f"/v1/projects/{proj['id']}/queries",
+            json=body,
+            retry=True,
+            idempotency_key=str(uuid.uuid4()),
+        )
 
 
 class Run:
@@ -280,10 +365,17 @@ class Run:
         )
         upload = init["upload"]
         resp = self.client._send(
-            self.client._upload, upload["method"], upload["url"], retry=True, content=data, headers=upload["headers"]
+            self.client._upload,
+            upload["method"],
+            upload["url"],
+            retry=True,
+            content=data,
+            headers=upload["headers"],
         )
         if not resp.is_success:
-            raise LabError(f"Upload of {file.name} failed ({resp.status_code}): {resp.text[:300]}", resp.status_code)
+            raise LabError(
+                f"Upload of {file.name} failed ({resp.status_code}): {resp.text[:300]}", resp.status_code
+            )
         return self.client._call("POST", f"/v1/artifacts/{init['artifact']['id']}/complete", retry=True)
 
     # lifecycle ---------------------------------------------------------------

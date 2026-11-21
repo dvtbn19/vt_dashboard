@@ -43,3 +43,30 @@ def test_sdk_marks_failed_run(client: TestClient, owner, project):
             1 / 0  # noqa: B018
     detail = client.get(f"/v1/runs/{run.id}", headers=owner).json()
     assert detail["status"] == "failed" and "ZeroDivisionError" in detail["error"]
+
+
+def test_sdk_notes_and_queries(client: TestClient, owner, project):
+    scopes = ["read", "notes:write", "queries:write"]
+    token = make_token(client, owner, [project["id"]], scopes=scopes)
+    lab = vtcons_lab.LabClient("http://testserver", token, transport=client._transport, backoff=0)
+
+    note = lab.publish_note(project["slug"], "Working notes", "# v1")
+    # The owner edits it in the Lab...
+    r = client.patch(
+        f"/v1/notes/{note['id']}", json={"base_version": 1, "body": "# owner edit"}, headers=owner
+    )
+    assert r.status_code == 200
+    # ...so publishing again must not overwrite, and a stale update is refused.
+    again = lab.publish_note(project["slug"], "Working notes", "# v1 again")
+    assert again["id"] == note["id"] and again["body"] == "# owner edit"
+    with pytest.raises(vtcons_lab.LabError) as exc:
+        lab.update_note(note["id"], 1, body="stale")
+    assert exc.value.status == 409
+
+    chart = {"type": "bar", "x": "a", "y": ["b"]}
+    q1 = lab.save_query(project["slug"], "Q1", "select 1 as a, 2 as b", chart=chart)
+    same = lab.save_query(project["slug"], "Q1", "select 1 as a, 2 as b", chart=chart)
+    assert same["version"] == q1["version"] == 1
+    changed = lab.save_query(project["slug"], "Q1", "select 1 as a, 3 as b", chart=chart)
+    assert changed["id"] == q1["id"] and changed["version"] == 2
+    assert [q["name"] for q in lab.list_queries(project["slug"])] == ["Q1"]

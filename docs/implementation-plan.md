@@ -66,6 +66,14 @@ Dependencies flow top to bottom. Each milestone must leave the system runnable.
 
 **Acceptance (MVP DoD):** sign in → create/open project → run the example → see the uploaded results (on a phone-width screen too). Tests pass. Remaining cloud setup steps are explicit in `docs/setup.md` / `docs/deployment.md`.
 
+## 2b. Owner-requested additions (2026-11-21)
+
+- [x] Working notes per project: Markdown editor in the Lab (write / split / preview, autosave, Cmd+S), optimistic concurrency (409 + "keep mine" / open latest), agents with `notes:write`
+- [x] Saved SQL queries per project + live read-only execution against `ANALYTICS_DATABASE_URL` (user only), result table, CSV download, bar/line/scatter chart saved with the query
+- [x] Project dashboard: every saved query with a chart, run live
+- [x] SDK: `publish_note`, `create_note`, `update_note`, `save_query`, `list_*`
+- [x] Migration 0003 (`notes`, `saved_queries`, RLS on)
+
 ## 3. Out of scope now
 
 M3–M6 (runners, hybrid execution, control center, MLOps integrations) — captured in `docs/roadmap.md`. The schema leaves room: runs carry `source`, `params`, `tags`; credentials carry permission scopes that can later include `tasks:claim`.
@@ -74,3 +82,4 @@ M3–M6 (runners, hybrid execution, control center, MLOps integrations) — capt
 
 - 2026-11-17 — Plan written, M0–M2 implemented. Verified locally: API 19 tests (SQLite), SDK 6 tests, ruff + mypy clean, web lint + typecheck + production build pass; Alembic PostgreSQL DDL generated offline. Manual smoke test done in a real browser against running servers: sign-in (wrong + right password), project created in the UI, token created in the UI, `run_eda.py` published a run, run page showed 8 metrics + PNG + Plotly + Markdown + CSV, downloads worked, phone width OK, revoked token rejected with 401.
 - Not verified: tests on a live PostgreSQL (no Docker/Postgres reachable from the agent sandbox; CI runs them), Supabase JWT/JWKS against a real project, R2 presigned URLs against a real bucket, the API Dockerfile build. Deployment not performed (needs Vercel root-dir change, API host, Supabase and R2 credentials — see `docs/deployment.md`).
+- 2026-11-21 — Notes, saved queries, live SQL and dashboard added at the owner's request. Verified locally: API 39 tests (SQLite) incl. read-only/multi-statement/scope/ownership negatives, SDK 6 tests, ruff + mypy clean, web lint + typecheck + build. Browser check against running servers (SQLite analytics DB loaded from the Range Review CSVs): note autosave, conflict warning and "keep mine", query run → table → chart → save, dashboard, phone width. Not verified locally: the PostgreSQL path of the query runner (CI runs the same tests on Postgres) and Supabase `team_ro` in production.

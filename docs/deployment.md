@@ -27,6 +27,20 @@ LAB_ALLOWED_EMAILS=<owner e-mail>
 STORAGE_BACKEND=r2
 R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET=...
 ```
+Optional — run SQL from the Lab (Queries / Dashboard pages):
+
+```
+ANALYTICS_DATABASE_URL=postgresql://team_ro.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres?sslmode=require
+QUERY_TIMEOUT_SECONDS=20
+QUERY_MAX_ROWS=5000
+```
+
+Use a role that can only `SELECT` the analysis schema — never the `postgres` owner or the
+`DATABASE_URL` user. `/health/ready` reports `analytics: ok (role team_ro)` but never fails on it.
+
+Migrations: on Vercel nothing runs `alembic upgrade`; apply new revisions with
+`alembic upgrade <from>:<to> --sql` and paste the output into the Supabase SQL Editor.
+
 The app refuses to start with `ENV=production` and `AUTH_MODE=local`, without `SUPABASE_URL`, or without `LAB_ALLOWED_EMAILS`. The container runs `alembic upgrade head` before starting.
 
 ## Web environment (Vercel)

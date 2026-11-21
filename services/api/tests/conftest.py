@@ -22,6 +22,8 @@ SECRET = "t" * 40
 def env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, str]]:
     tmp = tmp_path_factory.mktemp("lab")
     db_url = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp / 'test.db'}"
+    # Analytics queries run against a separate database (SQLite file locally, the same Postgres in CI).
+    analytics_url = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{tmp / 'analytics.db'}"
     values = {
         "ENV": "test",
         "DATABASE_URL": db_url,
@@ -35,6 +37,8 @@ def env(tmp_path_factory: pytest.TempPathFactory) -> Iterator[dict[str, str]]:
         "STORAGE_SIGNING_SECRET": "s" * 40,
         "API_PUBLIC_URL": "http://testserver",
         "MAX_ARTIFACT_BYTES": str(2 * 1024 * 1024),
+        "ANALYTICS_DATABASE_URL": analytics_url,
+        "QUERY_MAX_ROWS": "50",
     }
     old = {k: os.environ.get(k) for k in values}
     os.environ.update(values)
@@ -51,11 +55,12 @@ def app(env: dict[str, str]):
     from alembic.config import Config
 
     from alembic import command
+    from app.analytics import get_analytics_engine
     from app.config import get_settings
     from app.db import get_engine, get_sessionmaker
     from app.storage import get_storage
 
-    for fn in (get_settings, get_engine, get_sessionmaker, get_storage):
+    for fn in (get_settings, get_engine, get_sessionmaker, get_storage, get_analytics_engine):
         fn.cache_clear()
     cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[1] / "alembic"))

@@ -105,7 +105,7 @@ class LabClient:
         self._http.close()
         self._upload.close()
 
-    def __enter__(self) -> LabClient:
+    def __enter__(self) -> LabClient:  # noqa: PYI034 - Python 3.10 has no typing.Self
         return self
 
     def __exit__(self, *exc: object) -> None:
@@ -391,7 +391,7 @@ class Run:
         )
         return self.data
 
-    def __enter__(self) -> Run:
+    def __enter__(self) -> Run:  # noqa: PYI034 - Python 3.10 has no typing.Self
         return self
 
     def __exit__(

@@ -1,17 +1,13 @@
-/** Starting points for new notes. Plain Markdown; edit freely after creating. */
+import type { SectionRole } from "./noteDoc";
+
+/** Starting points for new notes (stored as Markdown; edited as a form in the Lab). */
 export const NOTE_TEMPLATES = {
-  blank: { title: "Untitled note", body: "" },
+  blank: { title: "Untitled note", body: "## Notes\n" },
   working: {
     title: "Working notes",
     body: `# Working notes
 
-Fill this in as you work, not at the end.
-
 ## 1. The request in my own words
-
-What is the stakeholder really asking? What decision will they make with the answer?
-
->
 
 ## 2. Questions for the stakeholder
 
@@ -46,8 +42,6 @@ What is the stakeholder really asking? What decision will they make with the ans
 
 ## 7. Recommendations
 
-1.
-
 ## 8. Questions I expect in the presentation
 
 | Question | My answer and evidence |
@@ -58,3 +52,15 @@ What is the stakeholder really asking? What decision will they make with the ans
 } as const;
 
 export type NoteTemplate = keyof typeof NOTE_TEMPLATES;
+
+/** Guidance shown above each part of a working-notes form. */
+export const SECTION_HINTS: Record<SectionRole, string> = {
+  request: "What is the stakeholder really asking? What decision will they make with the answer?",
+  questions: "Things to clarify with the stakeholder: when you asked and what they said.",
+  checks: "Row counts, date ranges, duplicates, nulls, odd values, and what you did about each.",
+  decisions: "Choices you made (filters, definitions, time windows) and how they change the result.",
+  hypotheses: "What you expected to see, how you tested it, and what happened.",
+  findings: "One finding per row, with the number. “So what?” is what it means for the stakeholder. Link the SQL that proves it.",
+  recommendations: "What should the stakeholder do? One per line, most important first.",
+  qa: "Hard questions you expect, with your answer and the evidence.",
+};

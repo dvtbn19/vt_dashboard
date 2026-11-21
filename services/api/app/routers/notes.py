@@ -13,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from app import idempotency as idem
 from app.auth import SCOPE_NOTES_WRITE, SCOPE_READ, CurrentPrincipal, CurrentUser, DbSession, Principal
-from app.models import Note, Project, utcnow
+from app.models import Note, Project, SavedQuery, utcnow
 from app.routers.projects import get_project_for
-from app.schemas import NoteCreate, NoteListItem, NoteOut, NoteUpdate
+from app.schemas import NoteCreate, NoteLink, NoteListItem, NoteOut, NoteUpdate
 
 router = APIRouter(prefix="/v1", tags=["notes"])
 IdemKey = Annotated[str | None, Header(alias="Idempotency-Key")]
@@ -29,6 +29,30 @@ def get_note_for(db: Session, principal: Principal, note_id: uuid.UUID) -> Note:
     if project is None or not principal.can_access_project(project):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
     return note
+
+
+def clean_links(db: Session, project_id: uuid.UUID, links: list[NoteLink]) -> list[dict[str, str]]:
+    """Dedupe links and keep only queries of the note's project.
+
+    Unknown ids are dropped rather than rejected: a query deleted while the note was open in an editor
+    must not make the next autosave fail.
+    """
+    ids = {link.query_id for link in links}
+    valid: set[uuid.UUID] = set()
+    if ids:
+        valid = set(
+            db.scalars(
+                select(SavedQuery.id).where(SavedQuery.project_id == project_id, SavedQuery.id.in_(ids))
+            )
+        )
+    out: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for link in links:
+        item = (str(link.query_id), link.section.strip())
+        if link.query_id in valid and item not in seen:
+            seen.add(item)
+            out.append({"query_id": item[0], "section": item[1]})
+    return out
 
 
 def conflict(current_version: int) -> HTTPException:
@@ -64,7 +88,13 @@ def create_note(
     fp = idem.fingerprint(f"notes:{project.id}", body.model_dump())
     if (replayed := idem.replay(db, principal, key, fp)) is not None:
         return replayed
-    note = Note(project_id=project.id, title=body.title, body=body.body, last_edited_by=principal.label)
+    note = Note(
+        project_id=project.id,
+        title=body.title,
+        body=body.body,
+        links=clean_links(db, project.id, body.links),
+        last_edited_by=principal.label,
+    )
     db.add(note)
     db.flush()
     payload = jsonable_encoder(NoteOut.model_validate(note))
@@ -86,6 +116,8 @@ def update_note(note_id: uuid.UUID, body: NoteUpdate, principal: CurrentPrincipa
     note = get_note_for(db, principal, note_id)
     changes = body.model_dump(exclude_unset=True, exclude={"base_version"})
     changes = {k: v for k, v in changes.items() if v is not None}
+    if body.links is not None:
+        changes["links"] = clean_links(db, note.project_id, body.links)
     if not changes:
         return note
     # Compare-and-set in SQL so two concurrent saves cannot both win.

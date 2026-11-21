@@ -311,21 +311,36 @@ NOTE_BODY_MAX = 500_000
 SQL_MAX = 100_000
 
 
+class NoteLink(BaseModel):
+    """A saved query this note relies on, optionally tied to one `## section` of the note."""
+
+    query_id: uuid.UUID
+    section: str = Field(
+        default="", max_length=200, description="Section heading, or empty for the whole note"
+    )
+
+
+NOTE_LINKS_MAX = 300
+
+
 class NoteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     body: str = Field(default="", max_length=NOTE_BODY_MAX)
+    links: list[NoteLink] = Field(default_factory=list, max_length=NOTE_LINKS_MAX)
 
 
 class NoteUpdate(BaseModel):
     base_version: int = Field(ge=1, description="The version you started editing from (409 if it changed)")
     title: str | None = Field(default=None, min_length=1, max_length=200)
     body: str | None = Field(default=None, max_length=NOTE_BODY_MAX)
+    links: list[NoteLink] | None = Field(default=None, max_length=NOTE_LINKS_MAX)
 
 
 class NoteListItem(ORM):
     id: uuid.UUID
     project_id: uuid.UUID
     title: str
+    links: list[NoteLink]
     version: int
     last_edited_by: str
     created_at: UtcDatetime

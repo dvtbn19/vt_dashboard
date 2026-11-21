@@ -277,3 +277,26 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  .no-print,
+  aside,
+  nav[aria-label="Lab"],
+  header.sticky {
+    display: none !important;
+  }
+  :root {
+    --bg: #ffffff;
+  }
+  body {
+    font-size: 12pt;
+  }
+  .sheet,
+  figure,
+  details {
+    break-inside: avoid;
+  }
+  details:not([open]) {
+    display: none;
+  }
+}

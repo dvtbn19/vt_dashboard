@@ -1,57 +1,53 @@
 import Link from "next/link";
-import { DashboardCard } from "@/components/DashboardCard";
+import { Presentation } from "@/components/Presentation";
 import { ProblemState } from "@/components/ProblemState";
-import { api } from "@/lib/api";
 import { attempt } from "@/lib/attempt";
-import type { Project, QueryEngine, SavedQuery } from "@/lib/types";
+import { loadPresentation } from "@/lib/presentation";
 
 export const metadata = { title: "Dashboard" };
 
-export default async function DashboardPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ note?: string }>;
+}) {
   const { id } = await params;
-  const res = await attempt(async () => {
-    const [project, list, engine] = await Promise.all([
-      api<Project>(`/v1/projects/${id}`),
-      api<SavedQuery[]>(`/v1/projects/${id}/queries`),
-      api<QueryEngine>("/v1/queries/engine"),
-    ]);
-    return { project, engine, charted: list.filter((q) => q.chart) };
-  });
+  const { note: noteId } = await searchParams;
+  const res = await attempt(() => loadPresentation(id, noteId));
   if (!res.ok) return <ProblemState problem={res.problem} />;
-  const { project, engine, charted } = res.data;
+  const data = res.data;
+  const q = data.note ? `?note=${data.note.id}` : "";
   return (
     <>
-      <Link href={`/lab/projects/${project.id}`} className="text-[14px] text-muted hover:text-ink">
-        {project.name}
-      </Link>
-      <h1 className="mt-2 text-[28px] font-bold leading-tight tracking-tight">Dashboard</h1>
-      <p className="mt-1 max-w-[70ch] text-muted">
-        Every saved query with a chart, run live against the analytics database each time you open this page.
-      </p>
-      {!engine.configured ? (
-        <div className="sheet mt-6 p-5">
-          <p className="font-semibold">Running SQL is not set up yet</p>
-          <p className="mt-1 text-[15px] text-muted">
-            Set <code className="font-mono">ANALYTICS_DATABASE_URL</code> on the API to a read-only database user, then reload.
-          </p>
-        </div>
-      ) : charted.length === 0 ? (
-        <div className="sheet mt-6 p-5">
-          <p className="font-semibold">No charts yet</p>
-          <p className="mt-1 text-[15px] text-muted">
-            Open a saved query, run it, pick a chart in the Chart tab and save. It will appear here.
-          </p>
-          <Link href={`/lab/projects/${project.id}/queries/new`} className="btn mt-4">
-            New query
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <Link href={`/lab/projects/${data.project.id}`} className="text-[14px] text-muted hover:text-ink">
+          ← {data.project.name}
+        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          {data.notes.length > 1 && (
+            <nav aria-label="Notes" className="flex flex-wrap gap-1 text-[13.5px]">
+              {data.notes.map((n) => (
+                <Link
+                  key={n.id}
+                  href={`?note=${n.id}`}
+                  className={`rounded-full px-3 py-1.5 ${n.id === data.note?.id ? "bg-sunken font-semibold" : "text-muted hover:text-ink"}`}
+                >
+                  {n.title}
+                </Link>
+              ))}
+            </nav>
+          )}
+          <Link href={`/lab/projects/${data.project.id}/workspace${q}`} className="btn btn-quiet !min-h-10 !px-3 text-[14px]">
+            Edit in workspace
+          </Link>
+          <Link href={`/lab/present/${data.project.id}${q}`} className="btn !min-h-10 !px-4 text-[14px]">
+            Present
           </Link>
         </div>
-      ) : (
-        <div className="mt-6 grid gap-5 xl:grid-cols-2">
-          {charted.map((q) => (
-            <DashboardCard key={q.id} query={q} projectId={project.id} />
-          ))}
-        </div>
-      )}
+      </div>
+      <Presentation data={data} mode="app" />
     </>
   );
 }

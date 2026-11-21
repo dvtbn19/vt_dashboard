@@ -7,9 +7,19 @@ import { ago } from "@/lib/format";
 import { defaultChart, usableChart } from "@/lib/queryResult";
 import type { ChartSpec, QueryEngine, QueryResult, SavedQuery } from "@/lib/types";
 
-type Props = { projectId: string; query: SavedQuery | null; engine: QueryEngine | null };
+type Props = {
+  projectId: string;
+  query: SavedQuery | null;
+  engine: QueryEngine | null;
+  /** Workspace mode: called after a save instead of changing the address to the query page. */
+  onSaved?: (q: SavedQuery, isNew: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Shown under the description (e.g. which notes use this query). */
+  aside?: React.ReactNode;
+  compact?: boolean;
+};
 
-export function QueryEditor({ projectId, query, engine }: Props) {
+export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, aside, compact }: Props) {
   const [id, setId] = useState(query?.id ?? null);
   const [version, setVersion] = useState(query?.version ?? null);
   const [name, setName] = useState(query?.name ?? "");
@@ -26,6 +36,10 @@ export function QueryEditor({ projectId, query, engine }: Props) {
   const [snapshot, setSnapshot] = useState(() => JSON.stringify({ name, description, sql, chart }));
   const dirty = JSON.stringify({ name, description, sql, chart }) !== snapshot;
   const canRun = engine?.configured !== false;
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
 
   const run = useCallback(async () => {
     if (!sql.trim() || running) return;
@@ -53,7 +67,21 @@ export function QueryEditor({ projectId, query, engine }: Props) {
         setVersion(res.version);
         setConflictVersion(null);
         setSaveMsg({ ok: true, text: `Saved · v${res.version} · ${ago(res.updated_at)}` });
-        if (!id) {
+        if (onSaved) {
+          if (!id) setId(res.id);
+          onSaved(
+            {
+              ...(query ?? { project_id: projectId, created_at: res.updated_at }),
+              ...fields,
+              name: fields.name.trim() || "Untitled query",
+              id: res.id,
+              version: res.version,
+              updated_at: res.updated_at,
+              last_edited_by: res.last_edited_by,
+            },
+            !id,
+          );
+        } else if (!id) {
           setId(res.id);
           // Update the address without navigating, so the result and chart on screen stay.
           window.history.replaceState(null, "", `/lab/projects/${projectId}/queries/${res.id}`);
@@ -63,7 +91,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
         setSaveMsg({ ok: false, text: res.error });
       }
     },
-    [version, name, description, sql, chart, projectId, id],
+    [version, name, description, sql, chart, projectId, id, onSaved, query],
   );
 
   useEffect(() => {
@@ -74,7 +102,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
         void run();
       } else if (e.key.toLowerCase() === "s") {
         e.preventDefault();
-        void save();
+        if (dirty || !id) void save();
       }
     };
     const onLeave = (e: BeforeUnloadEvent) => {
@@ -86,7 +114,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("beforeunload", onLeave);
     };
-  }, [run, save, dirty]);
+  }, [run, save, dirty, id]);
 
   const onSqlKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Tab" && !e.shiftKey) {
@@ -102,7 +130,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
     <div>
       <input
         aria-label="Query name"
-        className="w-full bg-transparent text-[26px] font-bold leading-tight tracking-tight outline-none placeholder:text-muted focus-visible:outline-2"
+        className={`w-full bg-transparent font-bold leading-tight tracking-tight outline-none placeholder:text-muted focus-visible:outline-2 ${compact ? "text-[20px]" : "text-[26px]"}`}
         value={name}
         maxLength={200}
         placeholder="Name this query"
@@ -117,6 +145,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
         placeholder="What does it answer? (optional)"
         onChange={(e) => setDescription(e.target.value)}
       />
+      {aside}
 
       {engine && !engine.configured && (
         <p role="status" className="mt-3 rounded-lg bg-run/10 px-3 py-2 text-[14.5px] text-run">
@@ -130,7 +159,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
       </label>
       <textarea
         id="sql"
-        className="field min-h-[260px] resize-y font-mono !text-[14px] leading-relaxed"
+        className={`field resize-y font-mono !text-[14px] leading-relaxed ${compact ? "min-h-[200px]" : "min-h-[260px]"}`}
         value={sql}
         spellCheck={false}
         autoCapitalize="off"
@@ -168,7 +197,7 @@ export function QueryEditor({ projectId, query, engine }: Props) {
         </div>
       )}
 
-      <section className="mt-8" aria-label="Result">
+      <section className={compact ? "mt-5" : "mt-8"} aria-label="Result">
         {runError && (
           <pre role="alert" className="whitespace-pre-wrap rounded-lg border border-fail/40 bg-fail/8 px-3 py-2 font-mono text-[13.5px] text-fail">
             {runError}

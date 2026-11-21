@@ -37,7 +37,10 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <h1 className="text-[28px] font-bold leading-tight tracking-tight">{p.name}</h1>
           {p.summary && <p className="mt-1 max-w-[70ch] text-muted">{p.summary}</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/lab/projects/${p.id}/workspace`} className="btn">
+            Workspace
+          </Link>
           <Link href={`/lab/projects/${p.id}/dashboard`} className="btn btn-quiet">
             Dashboard
           </Link>
@@ -124,14 +127,14 @@ with LabClient().start_run("${p.slug}", name="first-run") as run:
               <h2 id="notes-h" className="text-[19px] font-bold">
                 Notes
               </h2>
-              <p className="text-[14px] text-muted">Working notes you fill in as you go. Markdown, autosaved.</p>
+              <p className="text-[14px] text-muted">Working notes you fill in as you go, next to the SQL. Autosaved.</p>
             </div>
           </div>
           {notes.length > 0 && (
             <ul className="mb-4 divide-y divide-line border-y border-line">
               {notes.map((n) => (
                 <li key={n.id}>
-                  <Link href={`/lab/projects/${p.id}/notes/${n.id}`} className="flex items-center justify-between gap-3 px-1 py-3 hover:bg-sunken">
+                  <Link href={`/lab/projects/${p.id}/workspace?note=${n.id}`} className="flex items-center justify-between gap-3 px-1 py-3 hover:bg-sunken">
                     <span className="min-w-0 truncate font-semibold">{n.title}</span>
                     <span className="tnum shrink-0 text-[13.5px] text-muted" title={n.updated_at}>
                       {ago(n.updated_at)}
@@ -169,7 +172,7 @@ with LabClient().start_run("${p.slug}", name="first-run") as run:
             <ul className="mb-4 divide-y divide-line border-y border-line">
               {queries.map((q) => (
                 <li key={q.id}>
-                  <Link href={`/lab/projects/${p.id}/queries/${q.id}`} className="block px-1 py-3 hover:bg-sunken">
+                  <Link href={`/lab/projects/${p.id}/workspace?query=${q.id}`} className="block px-1 py-3 hover:bg-sunken">
                     <span className="flex items-center justify-between gap-3">
                       <span className="min-w-0 truncate font-semibold">{q.name}</span>
                       {q.chart && <span className="shrink-0 text-[12.5px] text-accent">chart</span>}
@@ -180,7 +183,7 @@ with LabClient().start_run("${p.slug}", name="first-run") as run:
               ))}
             </ul>
           )}
-          <Link href={`/lab/projects/${p.id}/queries/new`} className="btn btn-quiet">
+          <Link href={`/lab/projects/${p.id}/workspace?query=new`} className="btn btn-quiet">
             New query
           </Link>
         </section>

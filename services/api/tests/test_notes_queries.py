@@ -219,3 +219,62 @@ def test_run_query_cte_comment_and_semicolon(client: TestClient, owner, analytic
     r = client.post("/v1/queries/run", json={"sql": sql}, headers=owner)
     assert r.status_code == 200, r.text
     assert r.json()["rows"] == [[3]]
+
+
+def test_note_links_to_queries(client: TestClient, owner, project):
+    pid = project["id"]
+    q1 = client.post(
+        f"/v1/projects/{pid}/queries", json={"name": "links-q1", "sql": "select 1"}, headers=owner
+    ).json()
+    q2 = client.post(
+        f"/v1/projects/{pid}/queries", json={"name": "links-q2", "sql": "select 2"}, headers=owner
+    ).json()
+    other_proj = client.post(
+        "/v1/projects", json={"name": "Other", "slug": f"other-{q1['id'][:8]}"}, headers=owner
+    ).json()
+    foreign = client.post(
+        f"/v1/projects/{other_proj['id']}/queries", json={"name": "foreign", "sql": "select 3"}, headers=owner
+    ).json()
+
+    note = client.post(
+        f"/v1/projects/{pid}/notes",
+        json={
+            "title": "Linked",
+            "body": "## 6. Findings\n",
+            "links": [{"query_id": q1["id"], "section": "6. Findings"}],
+        },
+        headers=owner,
+    ).json()
+    assert note["links"] == [{"query_id": q1["id"], "section": "6. Findings"}]
+
+    # Duplicates collapse; queries of another project are dropped, never linked.
+    r = client.patch(
+        f"/v1/notes/{note['id']}",
+        json={
+            "base_version": 1,
+            "links": [
+                {"query_id": q1["id"], "section": "6. Findings"},
+                {"query_id": q1["id"], "section": "6. Findings"},
+                {"query_id": q2["id"], "section": ""},
+                {"query_id": foreign["id"], "section": "6. Findings"},
+            ],
+        },
+        headers=owner,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["version"] == 2
+    assert r.json()["links"] == [
+        {"query_id": q1["id"], "section": "6. Findings"},
+        {"query_id": q2["id"], "section": ""},
+    ]
+    listed = client.get(f"/v1/projects/{pid}/notes", headers=owner).json()
+    assert next(n for n in listed if n["id"] == note["id"])["links"] == r.json()["links"]
+
+    # Deleting a query removes it from notes without changing their version.
+    assert client.delete(f"/v1/queries/{q1['id']}", headers=owner).status_code == 204
+    after = client.get(f"/v1/notes/{note['id']}", headers=owner).json()
+    assert after["links"] == [{"query_id": q2["id"], "section": ""}] and after["version"] == 2
+
+    # A body-only update keeps the links.
+    r = client.patch(f"/v1/notes/{note['id']}", json={"base_version": 2, "body": "x"}, headers=owner)
+    assert r.json()["links"] == [{"query_id": q2["id"], "section": ""}]

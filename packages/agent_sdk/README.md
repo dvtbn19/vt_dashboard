@@ -44,6 +44,15 @@ note = lab.get_note(note_id); lab.update_note(note_id, note["version"], body="..
 
 lab.save_query("roomspace-analysis", "Q1 – Category", open("sql/q1_1_category.sql").read(),
                description="Sales growth by category", chart={"type": "bar", "x": "category_name", "y": ["sales_growth"]})
+
+# Link a saved query to a section of the note (the `## heading` text); keep existing links.
+q = lab.save_query(...)
+note = lab.get_note(note_id)
+lab.update_note(note_id, note["version"], links=note["links"] + [{"query_id": q["id"], "section": "6. Findings"}])
 ```
+
+In the Lab each `## section` of a note is shown as its own form field (tables become rows you fill in),
+next to the SQL editor, and the stakeholder dashboard pulls findings (section 6) and recommendations
+(section 7) from it.
 
 Agents can save SQL but cannot run it; the owner runs queries in the Lab against a read-only database user.

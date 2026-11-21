@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { signOut } from "../actions";
 import { BottomNav, SideNav } from "@/components/LabNav";
+import { MainFrame } from "@/components/MainFrame";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
 import { portfolioHref } from "@/lib/config";
@@ -61,7 +62,7 @@ export default async function LabLayout({ children }: { children: React.ReactNod
       </header>
 
       <main id="main" className="min-w-0 pb-24 lg:pb-12">
-        <div className="mx-auto w-full max-w-[1080px] px-4 pt-6 md:px-8 md:pt-10">{children}</div>
+        <MainFrame>{children}</MainFrame>
       </main>
       <BottomNav />
     </div>

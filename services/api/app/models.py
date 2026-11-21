@@ -164,6 +164,8 @@ class Note(TimestampMixin, Base):
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, default="", nullable=False)  # Markdown
+    # Saved queries this note relies on: [{"query_id": "<uuid>", "section": "<## heading>" or ""}].
+    links: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list, nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)
 

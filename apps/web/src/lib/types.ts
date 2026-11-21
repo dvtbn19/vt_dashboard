@@ -115,10 +115,13 @@ export function categoryLabel(v: string): string {
   return CATEGORIES.find((c) => c.value === v)?.label ?? v;
 }
 
+export type NoteLink = { query_id: string; section: string };
+
 export type NoteListItem = {
   id: string;
   project_id: string;
   title: string;
+  links: NoteLink[];
   version: number;
   last_edited_by: string;
   created_at: string;

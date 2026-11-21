@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError, ApiUnavailable } from "@/lib/api";
 import { NOTE_TEMPLATES, type NoteTemplate } from "@/lib/templates";
-import type { ChartSpec, Note, QueryResult, SavedQuery } from "@/lib/types";
+import type { ChartSpec, Note, NoteLink, QueryResult, SavedQuery } from "@/lib/types";
 
 export type SaveResult =
   | { ok: true; version: number; updated_at: string; last_edited_by: string; id: string }
@@ -43,14 +43,22 @@ export async function createNote(projectId: string, form: FormData) {
     body: JSON.stringify({ title: tpl.title, body: tpl.body }),
   });
   revalidatePath(`/lab/projects/${projectId}`);
-  redirect(`/lab/projects/${projectId}/notes/${note.id}`);
+  // Open it in the workspace (SQL on one side, the note on the other), keeping the open query.
+  const q = String(form.get("query") || "");
+  redirect(`/lab/projects/${projectId}/workspace?note=${note.id}${q ? `&query=${encodeURIComponent(q)}` : ""}`);
 }
 
-export async function saveNote(id: string, baseVersion: number, title: string, body: string): Promise<SaveResult> {
+export async function saveNote(
+  id: string,
+  baseVersion: number,
+  title: string,
+  body: string,
+  links?: NoteLink[],
+): Promise<SaveResult> {
   try {
     const n = await api<Note>(`/v1/notes/${id}`, {
       method: "PATCH",
-      body: JSON.stringify({ base_version: baseVersion, title: title.trim() || "Untitled note", body }),
+      body: JSON.stringify({ base_version: baseVersion, title: title.trim() || "Untitled note", body, links }),
     });
     revalidatePath(`/lab/projects/${n.project_id}`);
     return { ok: true, id: n.id, version: n.version, updated_at: n.updated_at, last_edited_by: n.last_edited_by };

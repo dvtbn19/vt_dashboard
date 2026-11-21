@@ -32,10 +32,15 @@ Auth header: `Authorization: Bearer <token>` — a user JWT (Supabase, or local 
 | POST | `/v1/credentials` | user | `{name, project_ids:[uuid…] or ["*"], scopes, expires_in_days}` → includes `token` **once** |
 | POST | `/v1/credentials/{id}/revoke` | user | |
 | GET | `/v1/projects/{id}/notes` | user, agent `read` | list (no bodies), newest first |
-| POST | `/v1/projects/{id}/notes` | user, agent `notes:write` | `{title, body}` (Markdown); honours `Idempotency-Key` |
+| POST | `/v1/projects/{id}/notes` | user, agent `notes:write` | `{title, body, links?}` (Markdown); honours `Idempotency-Key` |
 | GET | `/v1/notes/{id}` | user, agent `read` | includes `body`, `version`, `last_edited_by` |
-| PATCH | `/v1/notes/{id}` | user, agent `notes:write` | `{base_version, title?, body?}`; **409** `{message, current_version}` if it changed since `base_version` |
+| PATCH | `/v1/notes/{id}` | user, agent `notes:write` | `{base_version, title?, body?, links?}`; **409** `{message, current_version}` if it changed since `base_version` |
 | DELETE | `/v1/notes/{id}` | user | |
+
+Notes carry `links: [{query_id, section}]`: the saved queries a note relies on, each tied to one
+`## section` heading (or `""` for the whole note). Links to queries outside the note's project are
+dropped silently; deleting a query removes it from every note's links (without a version bump).
+The Lab edits a note as a form: each `## section` is a field group and Markdown tables become rows.
 | GET | `/v1/projects/{id}/queries` | user, agent `read` | saved queries incl. `sql` and `chart` |
 | POST | `/v1/projects/{id}/queries` | user, agent `queries:write` | `{name, sql, description?, chart?}`; `chart = {type: bar\|line\|scatter, x, y:[…]}`; 409 on duplicate name |
 | GET / PATCH / DELETE | `/v1/queries/{id}` | read / `queries:write` / user | PATCH needs `base_version` (409 as for notes); `chart: null` clears it |

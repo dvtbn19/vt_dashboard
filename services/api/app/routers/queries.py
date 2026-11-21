@@ -23,7 +23,7 @@ from app.auth import (
     DbSession,
     Principal,
 )
-from app.models import Project, SavedQuery, utcnow
+from app.models import Note, Project, SavedQuery, utcnow
 from app.routers.notes import conflict
 from app.routers.projects import get_project_for
 from app.schemas import (
@@ -162,6 +162,11 @@ def update_query(
 @router.delete("/queries/{query_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_query(query_id: uuid.UUID, principal: CurrentUser, db: DbSession) -> Response:
     q = get_query_for(db, principal, query_id)
+    # Drop links to it from the project's notes (without bumping their version: content is unchanged).
+    for note in db.scalars(select(Note).where(Note.project_id == q.project_id)):
+        kept = [link for link in note.links or [] if link.get("query_id") != str(q.id)]
+        if len(kept) != len(note.links or []):
+            note.links = kept
     db.delete(q)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

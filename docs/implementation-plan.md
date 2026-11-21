@@ -73,6 +73,10 @@ Dependencies flow top to bottom. Each milestone must leave the system runnable.
 - [x] Project dashboard: every saved query with a chart, run live
 - [x] SDK: `publish_note`, `create_note`, `update_note`, `save_query`, `list_*`
 - [x] Migration 0003 (`notes`, `saved_queries`, RLS on)
+- [x] Workspace (`/lab/projects/{id}/workspace`): SQL editor and the working note side by side (tabs on phones)
+- [x] Notes edited as a form: each `## section` is a field group, Markdown tables become row cards; raw Markdown still available; stored as Markdown (round-trip tested on the agent's real notes)
+- [x] Note ↔ query links per section (`notes.links`, migration 0004); "used in" shown on the query; links dropped when a query is deleted
+- [x] Stakeholder dashboard: cover, question, key numbers (latest completed run), findings (section 6), exhibits (linked/charted queries run live), recommendations (section 7), appendix; full-screen `/lab/present/{id}` with print / PDF
 
 ## 3. Out of scope now
 
@@ -83,3 +87,4 @@ M3–M6 (runners, hybrid execution, control center, MLOps integrations) — capt
 - 2026-11-17 — Plan written, M0–M2 implemented. Verified locally: API 19 tests (SQLite), SDK 6 tests, ruff + mypy clean, web lint + typecheck + production build pass; Alembic PostgreSQL DDL generated offline. Manual smoke test done in a real browser against running servers: sign-in (wrong + right password), project created in the UI, token created in the UI, `run_eda.py` published a run, run page showed 8 metrics + PNG + Plotly + Markdown + CSV, downloads worked, phone width OK, revoked token rejected with 401.
 - Not verified: tests on a live PostgreSQL (no Docker/Postgres reachable from the agent sandbox; CI runs them), Supabase JWT/JWKS against a real project, R2 presigned URLs against a real bucket, the API Dockerfile build. Deployment not performed (needs Vercel root-dir change, API host, Supabase and R2 credentials — see `docs/deployment.md`).
 - 2026-11-21 — Notes, saved queries, live SQL and dashboard added at the owner's request. Verified locally: API 39 tests (SQLite) incl. read-only/multi-statement/scope/ownership negatives, SDK 6 tests, ruff + mypy clean, web lint + typecheck + build. Browser check against running servers (SQLite analytics DB loaded from the Range Review CSVs): note autosave, conflict warning and "keep mine", query run → table → chart → save, dashboard, phone width. Not verified locally: the PostgreSQL path of the query runner (CI runs the same tests on Postgres) and Supabase `team_ro` in production.
+- 2026-11-21 (later) — Workspace, form-based notes, note↔query links, stakeholder dashboard. API 40 tests, ruff + mypy, web lint + typecheck + build. Browser check against local servers with the agent's real `working_notes.md` and SQLite tables from its CSVs: desktop split view, query run + chart, note sections and row cards, link via dropdown + autosave (v2 with the new link persisted in Markdown and `links`), dashboard and present view at 1440px and 390px (no horizontal scroll).

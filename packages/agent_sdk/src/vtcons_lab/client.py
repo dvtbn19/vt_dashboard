@@ -237,15 +237,27 @@ class LabClient:
         )
 
     def update_note(
-        self, note_id: str, base_version: int, *, title: str | None = None, body: str | None = None
+        self,
+        note_id: str,
+        base_version: int,
+        *,
+        title: str | None = None,
+        body: str | None = None,
+        links: list[dict[str, str]] | None = None,
     ) -> dict[str, Any]:
         """Update a note you read at `base_version`. Raises LabError(status=409) if it changed since:
-        the owner may be editing it in the Lab, so re-read it instead of overwriting."""
+        the owner may be editing it in the Lab, so re-read it instead of overwriting.
+
+        `links` replaces the note's links to saved queries: `[{"query_id": id, "section": "6. Findings"}]`
+        (`section` is a `## heading` of the note, or "" for the whole note). Read `note["links"]` first
+        and extend it, so links the owner made are kept."""
         payload: dict[str, Any] = {"base_version": base_version}
         if title is not None:
             payload["title"] = title
         if body is not None:
             payload["body"] = body
+        if links is not None:
+            payload["links"] = links
         return self._call("PATCH", f"/v1/notes/{note_id}", json=payload)
 
     def publish_note(self, project: str, title: str, body: str) -> dict[str, Any]:

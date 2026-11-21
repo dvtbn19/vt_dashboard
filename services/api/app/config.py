@@ -14,6 +14,10 @@ class Settings(BaseSettings):
 
     env: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://vtlab:vtlab@127.0.0.1:5432/vtlab"
+    # "none": open a connection per request and close it afterwards (serverless: idle function
+    # instances must not hold Supabase pooler slots). "pooled": keep a small local pool (long-running
+    # servers). "auto": "none" on Vercel/AWS Lambda, otherwise "pooled".
+    database_pool: Literal["auto", "pooled", "none"] = "auto"
 
     # Public base URL of this API (used to build local-storage upload/download links).
     api_public_url: str = "http://127.0.0.1:8000"

@@ -6,7 +6,7 @@ Target: web on Vercel, API as an always-on container, PostgreSQL on Supabase, fi
 
 | Item | Where | Used by |
 |---|---|---|
-| Supabase project | supabase.com | `DATABASE_URL` (session pooler URL, `postgresql+psycopg://…`), `SUPABASE_URL`, anon key |
+| Supabase project | supabase.com | `DATABASE_URL` (pooler URL, `postgresql+psycopg://…`; the transaction pooler on port 6543 is preferred for Vercel), `SUPABASE_URL`, anon key |
 | An owner user in Supabase Auth (email + password), sign-ups disabled | Supabase → Authentication | sign-in |
 | R2 bucket (private) + API token with Object Read & Write on that bucket | Cloudflare → R2 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
 | R2 bucket CORS: allow `PUT` from nothing (SDK uploads are server-to-server) and `GET` from the lab origin if needed | R2 → bucket settings | downloads/previews |
@@ -19,6 +19,10 @@ Target: web on Vercel, API as an always-on container, PostgreSQL on Supabase, fi
 ```
 ENV=production
 DATABASE_URL=postgresql+psycopg://...supabase pooler...
+# On Vercel the API opens one connection per request and closes it (DATABASE_POOL=auto → no pool),
+# because idle function instances holding connections exhaust the session pooler
+# ("EMAXCONNSESSION max clients reached in session mode", seen 2026-11-21). Port 6543 (transaction
+# pooler) shares server connections between clients and is the better fit; prepared statements are off.
 API_PUBLIC_URL=https://api.lab.vtcons.com
 CORS_ORIGINS=https://lab.vtcons.com,https://william-doan.vtcons.com
 AUTH_MODE=supabase

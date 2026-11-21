@@ -23,6 +23,9 @@ DATABASE_URL=postgresql+psycopg://...supabase pooler...
 # because idle function instances holding connections exhaust the session pooler
 # ("EMAXCONNSESSION max clients reached in session mode", seen 2026-11-21). Port 6543 (transaction
 # pooler) shares server connections between clients and is the better fit; prepared statements are off.
+# Function region: `services/api/vercel.json` and `apps/web/vercel.json` pin functions to `hnd1`
+# (Tokyo), next to the Supabase project (ap-northeast-1). With the default `iad1` every API call
+# crossed the Pacific several times (~3.5 s per call); keep them in the database's region.
 API_PUBLIC_URL=https://api.lab.vtcons.com
 CORS_ORIGINS=https://lab.vtcons.com,https://william-doan.vtcons.com
 AUTH_MODE=supabase

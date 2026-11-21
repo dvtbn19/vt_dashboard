@@ -54,7 +54,8 @@ def create_app() -> FastAPI:
         # SQLSTATE (no parameters, no DETAIL lines) so deployment problems are visible in the UI.
         logging.getLogger("vtcons.api").exception("Database error on %s %s", request.method, request.url.path)
         diag = getattr(exc.orig, "diag", None)
-        primary = getattr(diag, "message_primary", None) or exc.orig.__class__.__name__
+        first_line = (str(exc.orig).strip().splitlines() or [""])[0]
+        primary = getattr(diag, "message_primary", None) or f"{exc.orig.__class__.__name__}: {first_line}"
         sqlstate = getattr(diag, "sqlstate", None) or "?"
         return JSONResponse({"detail": f"Database error ({sqlstate}): {primary}"[:300]}, status_code=500)
 

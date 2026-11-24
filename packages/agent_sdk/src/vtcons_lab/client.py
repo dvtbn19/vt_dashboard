@@ -284,7 +284,10 @@ class LabClient:
     ) -> dict[str, Any]:
         """Create or update the saved query `name` (needs `queries:write`).
 
-        `chart` is optional: {"type": "bar"|"line"|"scatter", "x": "<column>", "y": ["<column>", ...]}.
+        `chart` is optional: {"type": "bar"|"hbar"|"line"|"area"|"scatter", "x": "<column>", "y": ["<column>", ...]},
+        plus optional "agg" ("sum"|"avg"|"min"|"max"|"count"|"none"), "color" (a column: one colour per value),
+        "facet" (a column, or "@measures": one small chart each), "barmode" ("group"|"stack"|"percent"),
+        "sort" ("none"|"desc"|"asc") and "filters" ([{"column": "<column>", "values": [...]}]).
         Queries with a chart appear on the project's dashboard. Agents can save SQL but never run it.
         """
         proj = self.get_project(project)

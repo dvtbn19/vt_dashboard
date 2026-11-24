@@ -2,6 +2,7 @@
 
 import type { Data, Layout } from "plotly.js";
 import { useEffect, useRef, useState } from "react";
+import { PALETTE } from "@/lib/chart";
 
 type Figure = { data: unknown[]; layout: Record<string, unknown> };
 
@@ -21,16 +22,39 @@ function figureTitle(layout: Record<string, unknown>): string {
   return typeof text === "string" ? text.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").trim() : "";
 }
 
-/** Table cells keep their own (usually light) fill, so give them dark text unless the figure set a colour. */
+function themeMode(): "light" | "dark" {
+  const set = document.documentElement.dataset.theme;
+  if (set === "light" || set === "dark") return set;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Resolve palette slots (meta.slot, set by lib/chart.ts) to this theme's step of the hue, add the
+ * surface-coloured gap between adjacent fills, and give table cells dark text on their light fill.
+ */
 function themedData(data: unknown[], layout: Record<string, unknown>): unknown[] {
   const fallback = ((layout.font ?? {}) as { color?: unknown }).color;
   const dark = typeof fallback === "string" ? fallback : "#1f1f1f";
+  const mode = themeMode();
+  const surface = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim() || "#ffffff";
   return data.map((trace) => {
     const t = trace as Record<string, unknown>;
-    if (t.type !== "table") return trace;
-    const cells = (t.cells ?? {}) as Record<string, unknown>;
-    const font = (cells.font ?? {}) as Record<string, unknown>;
-    return font.color ? trace : { ...t, cells: { ...cells, font: { ...font, color: dark } } };
+    if (t.type === "table") {
+      const cells = (t.cells ?? {}) as Record<string, unknown>;
+      const font = (cells.font ?? {}) as Record<string, unknown>;
+      return font.color ? trace : { ...t, cells: { ...cells, font: { ...font, color: dark } } };
+    }
+    const slot = (t.meta as { slot?: number | "other" } | undefined)?.slot;
+    if (slot === undefined) return trace;
+    const color = slot === "other" ? PALETTE.other : PALETTE[mode][slot % PALETTE[mode].length];
+    if (t.type === "bar") return { ...t, marker: { ...(t.marker as object), color, line: { color: surface, width: 1.5 } } };
+    const mode_ = String(t.mode ?? "");
+    return {
+      ...t,
+      line: { ...(t.line as object), color, width: 2 },
+      marker: { ...(t.marker as object), color, size: mode_ === "markers" ? 9 : 6, line: { color: surface, width: mode_ === "markers" ? 1.5 : 0 } },
+      ...(t.stackgroup ? { fillcolor: `${color}99` } : {}),
+    };
   });
 }
 
@@ -58,7 +82,7 @@ function themed(layout: Record<string, unknown>) {
     font: { family: "Be Vietnam Pro, system-ui, sans-serif", size: typeof font.size === "number" ? font.size : 12, color: ink },
     hoverlabel: { ...(layout.hoverlabel as object), bgcolor: undefined },
     margin: { ...m, l: num(m.l, MIN_MARGIN.l), r: num(m.r, MIN_MARGIN.r), t: num(m.t, MIN_MARGIN.t), b: num(m.b, MIN_MARGIN.b) },
-    colorway: ["#414487", "#2a788e", "#22a884", "#7ad151", "#c9b400", "#440154"],
+    colorway: PALETTE[themeMode()],
   };
 }
 

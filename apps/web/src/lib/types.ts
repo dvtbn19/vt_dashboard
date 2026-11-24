@@ -129,8 +129,26 @@ export type NoteListItem = {
 };
 export type Note = NoteListItem & { body: string };
 
-export type ChartType = "bar" | "line" | "scatter";
-export type ChartSpec = { type: ChartType; x: string; y: string[] };
+export type ChartType = "bar" | "hbar" | "line" | "area" | "scatter";
+export type ChartAgg = "sum" | "avg" | "min" | "max" | "count" | "none";
+export type FilterValue = string | number | boolean | null;
+export type ChartFilter = { column: string; values: FilterValue[] };
+/** A saved chart. Fields after `y` are optional so older specs ({type, x, y}) keep working. */
+export type ChartSpec = {
+  type: ChartType;
+  x: string;
+  y: string[];
+  /** How rows sharing an X value combine; absent = "none" (every row is a point, the original behaviour). */
+  agg?: ChartAgg;
+  /** Dimension whose values get one colour each (Tableau's Color shelf). */
+  color?: string | null;
+  /** One small chart per value of this column, or "@measures" for one per measure. */
+  facet?: string | null;
+  barmode?: "group" | "stack" | "percent";
+  sort?: "none" | "desc" | "asc";
+  /** Keep only rows whose column value is in `values`. */
+  filters?: ChartFilter[];
+};
 
 export type SavedQueryListItem = {
   id: string;

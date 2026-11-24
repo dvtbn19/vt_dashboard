@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { PlotlyChart } from "./PlotlyChart";
-import { downloadCsv, figureFor, formatCell, numericColumns } from "@/lib/queryResult";
-import type { ChartSpec, ChartType, QueryResult } from "@/lib/types";
+import { AGG_LABEL, MEASURES, buildChart, distinctValues, key, numericColumns } from "@/lib/chart";
+import { downloadCsv, formatCell } from "@/lib/queryResult";
+import type { ChartAgg, ChartFilter, ChartSpec, ChartType, FilterValue, QueryResult } from "@/lib/types";
 
 export function ResultTable({ result }: { result: QueryResult }) {
   if (result.columns.length === 0) return <p className="text-muted">The statement returned no columns.</p>;
@@ -40,6 +41,86 @@ export function ResultTable({ result }: { result: QueryResult }) {
   );
 }
 
+const MARKS: { type: ChartType; label: string }[] = [
+  { type: "bar", label: "Bar" },
+  { type: "hbar", label: "Bar ↔" },
+  { type: "line", label: "Line" },
+  { type: "area", label: "Area" },
+  { type: "scatter", label: "Scatter" },
+];
+
+function Shelf({ label, htmlFor, children }: { label: string; htmlFor?: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <label className="label !mb-1 text-[13px]" htmlFor={htmlFor}>
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const sel = "field !min-h-10 w-full !py-1.5 text-[14px]";
+
+/** One filter: pick which values of a column to keep. */
+function FilterEditor({
+  result,
+  filter,
+  onChange,
+  onRemove,
+}: {
+  result: QueryResult;
+  filter: ChartFilter;
+  onChange: (f: ChartFilter) => void;
+  onRemove: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const values = useMemo(() => distinctValues(result, filter.column) ?? [], [result, filter.column]);
+  // A filter that keeps nothing or everything was just added (or needs attention): show its values.
+  const [open, setOpen] = useState(filter.values.length === 0 || filter.values.length >= values.length);
+  const keep = new Set(filter.values.map((v) => key(v)));
+  const shown = values.filter((v) => !q || String(v.value).toLowerCase().includes(q.toLowerCase()));
+  const toggle = (v: FilterValue) =>
+    onChange({ ...filter, values: keep.has(key(v)) ? filter.values.filter((x) => key(x) !== key(v)) : [...filter.values, v] });
+  const summary = filter.values.length === 0 ? "none selected" : filter.values.length === values.length ? "all" : `${filter.values.length} of ${values.length}`;
+  return (
+    <div className="rounded-lg border border-line">
+      <div className="flex items-center gap-2 px-2 py-1">
+        <button type="button" className="min-h-9 min-w-0 flex-1 truncate text-left text-[14px]" onClick={() => setOpen(!open)} aria-expanded={open}>
+          <span className="font-semibold">{filter.column}</span> <span className="text-muted">· {summary}</span>
+        </button>
+        <button type="button" className="min-h-9 px-2 text-muted hover:text-fail" onClick={onRemove} aria-label={`Remove filter on ${filter.column}`}>
+          ×
+        </button>
+      </div>
+      {open && (
+        <div className="border-t border-line p-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <input className="field !min-h-9 min-w-0 flex-1 !py-1 text-[14px]" placeholder="Search values" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search values" />
+            <button type="button" className="text-[13px] underline" onClick={() => onChange({ ...filter, values: values.map((v) => v.value) })}>
+              All
+            </button>
+            <button type="button" className="text-[13px] underline" onClick={() => onChange({ ...filter, values: [] })}>
+              None
+            </button>
+          </div>
+          <div className="mt-2 max-h-56 overflow-auto">
+            {shown.map((v) => (
+              <label key={key(v.value)} className="flex min-h-8 items-center gap-2 text-[14px]">
+                <input type="checkbox" className="h-4 w-4 accent-(--accent)" checked={keep.has(key(v.value))} onChange={() => toggle(v.value)} />
+                <span className="min-w-0 flex-1 truncate">{v.value === null ? "(null)" : String(v.value)}</span>
+                <span className="tnum text-[12.5px] text-muted">{v.count}</span>
+              </label>
+            ))}
+            {shown.length === 0 && <p className="hint">No matching values.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Tableau-style shelves: Marks, Columns (X), measures + aggregation, Color, small multiples, sort, filters. */
 export function ChartPicker({
   result,
   spec,
@@ -50,55 +131,153 @@ export function ChartPicker({
   onChange: (s: ChartSpec | null) => void;
 }) {
   const nums = numericColumns(result);
-  const current = spec ?? { type: "bar" as ChartType, x: result.columns[0], y: [] };
+  const current: ChartSpec = spec ?? { type: "bar", x: result.columns[0], y: [], agg: "sum" };
   const set = (patch: Partial<ChartSpec>) => {
     const next = { ...current, ...patch };
     onChange(next.y.length ? next : null);
   };
+  const filters = current.filters ?? [];
+  const filterable = result.columns.filter((c) => !filters.some((f) => f.column === c));
+  const dims = result.columns.filter((c) => !current.y.includes(c));
+  const stackable = current.type === "bar" || current.type === "hbar" || current.type === "area";
   return (
-    <div className="flex flex-wrap items-end gap-4 text-[14px]">
-      <div>
-        <label className="label" htmlFor="ctype">
-          Chart
-        </label>
-        <select className="field !min-h-10 !py-1.5" id="ctype" value={current.type} onChange={(e) => set({ type: e.target.value as ChartType })}>
-          <option value="bar">Bar</option>
-          <option value="line">Line</option>
-          <option value="scatter">Scatter</option>
-        </select>
+    <div className="space-y-3 rounded-xl border border-line bg-sunken/40 p-3 text-[14px]">
+      <div role="radiogroup" aria-label="Mark type" className="flex flex-wrap gap-1">
+        {MARKS.map((m) => (
+          <button
+            key={m.type}
+            type="button"
+            role="radio"
+            aria-checked={current.type === m.type}
+            onClick={() => set({ type: m.type })}
+            className={`min-h-9 rounded-md border px-3 text-[14px] ${current.type === m.type ? "border-accent bg-accent text-accent-ink" : "border-line bg-surface hover:border-muted"}`}
+          >
+            {m.label}
+          </button>
+        ))}
       </div>
-      <div>
-        <label className="label" htmlFor="cx">
-          X axis
-        </label>
-        <select className="field !min-h-10 !py-1.5" id="cx" value={current.x} onChange={(e) => set({ x: e.target.value })}>
-          {result.columns.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Shelf label={current.type === "hbar" ? "Rows (dimension)" : "X / Columns"} htmlFor="cx">
+          <select className={sel} id="cx" value={current.x} onChange={(e) => set({ x: e.target.value })}>
+            {result.columns.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </Shelf>
+        <Shelf label="Aggregate" htmlFor="cagg">
+          <select className={sel} id="cagg" value={current.agg ?? "none"} onChange={(e) => set({ agg: e.target.value as ChartAgg })}>
+            {(Object.keys(AGG_LABEL) as ChartAgg[]).map((a) => (
+              <option key={a} value={a}>
+                {AGG_LABEL[a]}
+              </option>
+            ))}
+          </select>
+        </Shelf>
+        <Shelf label="Color by" htmlFor="ccolor">
+          <select className={sel} id="ccolor" value={current.color ?? ""} onChange={(e) => set({ color: e.target.value || null })}>
+            <option value="">None</option>
+            {dims
+              .filter((c) => c !== current.x)
+              .map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+          </select>
+        </Shelf>
+        <Shelf label="Split into charts by" htmlFor="cfacet">
+          <select className={sel} id="cfacet" value={current.facet ?? ""} onChange={(e) => set({ facet: e.target.value || null })}>
+            <option value="">None</option>
+            {current.y.length > 1 && <option value={MEASURES}>Each measure</option>}
+            {dims
+              .filter((c) => c !== current.x)
+              .map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+          </select>
+        </Shelf>
+        {stackable && (
+          <Shelf label="Bars" htmlFor="cmode">
+            <select className={sel} id="cmode" value={current.barmode ?? "group"} onChange={(e) => set({ barmode: e.target.value as ChartSpec["barmode"] })}>
+              <option value="group">{current.type === "area" ? "Stacked" : "Side by side"}</option>
+              {current.type !== "area" && <option value="stack">Stacked</option>}
+              <option value="percent">100% stacked</option>
+            </select>
+          </Shelf>
+        )}
+        <Shelf label="Sort" htmlFor="csort">
+          <select className={sel} id="csort" value={current.sort ?? "none"} onChange={(e) => set({ sort: e.target.value as ChartSpec["sort"] })}>
+            <option value="none">Data order</option>
+            <option value="desc">Largest first</option>
+            <option value="asc">Smallest first</option>
+          </select>
+        </Shelf>
       </div>
       <fieldset className="min-w-0">
-        <legend className="label">Y axis (numbers)</legend>
+        <legend className="label !mb-1 text-[13px]">Measures (numbers)</legend>
         {nums.length === 0 ? (
           <p className="hint">No numeric columns in this result.</p>
         ) : (
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {nums.map((c) => (
-              <label key={c} className="flex min-h-9 items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-(--accent)"
-                  checked={current.y.includes(c)}
-                  onChange={(e) => set({ y: e.target.checked ? [...current.y, c] : current.y.filter((y) => y !== c) })}
-                />
-                {c}
-              </label>
-            ))}
+          <div className="flex flex-wrap gap-1.5">
+            {nums.map((c) => {
+              const on = current.y.includes(c);
+              return (
+                <label
+                  key={c}
+                  className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 text-[13.5px] ${on ? "border-accent bg-accent/10" : "border-line bg-surface"}`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-(--accent)"
+                    checked={on}
+                    onChange={(e) => set({ y: e.target.checked ? [...current.y, c] : current.y.filter((y) => y !== c) })}
+                  />
+                  {c}
+                </label>
+              );
+            })}
           </div>
         )}
       </fieldset>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="label !mb-0 text-[13px]">Filters</span>
+          <select
+            className="field !min-h-9 !w-auto !py-1 text-[14px]"
+            aria-label="Add a filter"
+            value=""
+            onChange={(e) => e.target.value && set({ filters: [...filters, { column: e.target.value, values: (distinctValues(result, e.target.value) ?? []).map((v) => v.value) }] })}
+          >
+            <option value="">+ Filter by…</option>
+            {filterable.map((c) => {
+              const many = distinctValues(result, c) === null;
+              return (
+                <option key={c} value={c} disabled={many}>
+                  {c}
+                  {many ? " (too many values)" : ""}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        {filters.length > 0 && (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {filters.map((f, i) => (
+              <FilterEditor
+                key={f.column}
+                result={result}
+                filter={f}
+                onChange={(nf) => set({ filters: filters.map((x, j) => (j === i ? nf : x)) })}
+                onRemove={() => set({ filters: filters.filter((_, j) => j !== i) })}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -116,7 +295,9 @@ export function ResultView({
   onSpecChange?: (s: ChartSpec | null) => void;
 }) {
   const [tab, setTab] = useState<"table" | "chart">(spec ? "chart" : "table");
-  const figure = useMemo(() => (spec ? figureFor(spec, result) : null), [spec, result]);
+  const built = useMemo(() => (spec ? buildChart(spec, result) : null), [spec, result]);
+  const figure = built?.figure ?? null;
+  const info = built?.info;
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -150,6 +331,15 @@ export function ResultView({
         ) : (
           <div className="space-y-4">
             {onSpecChange && <ChartPicker result={result} spec={spec} onChange={onSpecChange} />}
+            {info && (info.folded > 0 || info.hiddenPanels > 0 || info.measuresDropped > 0 || info.rows === 0) && (
+              <p className="hint" role="status">
+                {info.rows === 0 && "No rows left after the filters. "}
+                {info.folded > 0 &&
+                  `${info.colorValues} colour values: the ${info.colorValues - info.folded} largest have their own colour, the other ${info.folded} are grouped as “Other”. Add a filter or use small multiples to see them all. `}
+                {info.hiddenPanels > 0 && `${info.hiddenPanels} more small charts not shown; add a filter. `}
+                {info.measuresDropped > 0 && "With Color and small multiples by a column, only the first measure is drawn."}
+              </p>
+            )}
             {figure ? (
               <PlotlyChart figure={figure} title={name} />
             ) : (

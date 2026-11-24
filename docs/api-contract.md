@@ -44,6 +44,8 @@ The Lab edits a note as a form: each `## section` is a field group and Markdown 
 | GET | `/v1/projects/{id}/queries` | user, agent `read` | saved queries incl. `sql` and `chart` |
 | POST | `/v1/projects/{id}/queries` | user, agent `queries:write` | `{name, sql, description?, chart?}`; `chart = {type: bar\|line\|scatter, x, y:[…]}`; 409 on duplicate name |
 | GET / PATCH / DELETE | `/v1/queries/{id}` | read / `queries:write` / user | PATCH needs `base_version` (409 as for notes); `chart: null` clears it |
+
+A query's `chart`: `{type: bar|hbar|line|area|scatter, x, y: [measures]}` plus optional `agg` (sum|avg|min|max|count|none; absent = every row), `color` (column, one hue per value; past 8 values the smallest fold into "Other"), `facet` (column or `@measures`: one small chart each), `barmode` (group|stack|percent), `sort` (none|desc|asc), `filters` (`[{column, values}]`, keep rows whose value is listed). Stored and returned exactly as sent.
 | GET | `/v1/queries/engine` | user | `{configured, timeout_seconds, max_rows}` |
 | POST | `/v1/queries/run` | **user only** | `{sql, max_rows≤5000}` → `{columns, rows, row_count, truncated, elapsed_ms}`; 400 with the database message; 503 if `ANALYTICS_DATABASE_URL` is unset |
 | POST | `/v1/queries/{id}/run?max_rows=` | **user only** | runs a saved query; if its SQL holds several statements (the editor runs one at a time, at the cursor or selection), the first one runs |

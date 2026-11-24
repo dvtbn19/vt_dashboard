@@ -104,7 +104,7 @@ def create_query(
         name=body.name,
         description=body.description,
         sql=body.sql,
-        chart=body.chart.model_dump() if body.chart else None,
+        chart=body.chart.to_json() if body.chart else None,
         last_edited_by=principal.label,
     )
     db.add(q)
@@ -135,6 +135,8 @@ def update_query(
     changes = body.model_dump(exclude_unset=True, exclude={"base_version"})
     # `chart: null` clears the chart; other fields are only changed when given a value.
     changes = {k: v for k, v in changes.items() if v is not None or k == "chart"}
+    if body.chart is not None:
+        changes["chart"] = body.chart.to_json()
     if not changes:
         return q
     try:

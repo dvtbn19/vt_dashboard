@@ -354,10 +354,33 @@ class NoteOut(NoteListItem):
 # --- saved queries ----------------------------------------------------------------
 
 
+FilterValue = Annotated[str, Field(max_length=500)] | int | float | bool | None
+
+
+class ChartFilter(BaseModel):
+    column: str = Field(min_length=1, max_length=200)
+    values: list[FilterValue] = Field(default_factory=list, max_length=500)
+
+
 class ChartSpec(BaseModel):
-    type: Literal["bar", "line", "scatter"] = "bar"
+    """A saved chart. Everything after `y` is optional; older specs ({type, x, y}) stay valid."""
+
+    type: Literal["bar", "hbar", "line", "area", "scatter"] = "bar"
     x: str = Field(min_length=1, max_length=200)
     y: list[str] = Field(min_length=1, max_length=8)
+    agg: Literal["sum", "avg", "min", "max", "count", "none"] | None = None
+    color: str | None = Field(default=None, max_length=200)
+    facet: str | None = Field(default=None, max_length=200)  # a column, or "@measures"
+    barmode: Literal["group", "stack", "percent"] | None = None
+    sort: Literal["none", "desc", "asc"] | None = None
+    filters: list[ChartFilter] = Field(default_factory=list, max_length=20)
+
+    def to_json(self) -> dict[str, Any]:
+        """Stored form: only the fields that are set, so older specs round-trip unchanged."""
+        out = self.model_dump(exclude_none=True)
+        if not out.get("filters"):
+            out.pop("filters", None)
+        return out
 
 
 class QueryCreate(BaseModel):
@@ -388,7 +411,7 @@ class QueryListItem(ORM):
 
 class QueryOut(QueryListItem):
     sql: str
-    chart: ChartSpec | None
+    chart: dict[str, Any] | None  # a ChartSpec, returned exactly as stored
 
 
 class QueryRun(BaseModel):

@@ -119,6 +119,17 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
     }
   }, [sql, running, engine]);
 
+  // A saved query with a chart shows its chart right away (read-only, same limits as Run).
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || !query?.chart || !canRun) return;
+    const t = window.setTimeout(() => {
+      autoRan.current = true;
+      void run();
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [query, canRun, run]);
+
   const save = useCallback(
     async (baseVersion = version, asNew = false) => {
       setSaving(true);

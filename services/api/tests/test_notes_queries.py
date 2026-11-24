@@ -305,3 +305,34 @@ def test_saved_query_with_several_statements_runs_the_first(
     assert r.json()["columns"] == ["n"] and r.json()["rows"][0][0] == 120
     # Ad-hoc runs stay strictly one statement.
     assert client.post("/v1/queries/run", json={"sql": sql}, headers=owner).status_code == 400
+
+
+def test_chart_spec_round_trip(client: TestClient, owner, project):
+    pid = project["id"]
+    old = {"type": "bar", "x": "store", "y": ["total"]}
+    q = client.post(
+        f"/v1/projects/{pid}/queries", json={"name": "c1", "sql": "select 1", "chart": old}, headers=owner
+    )
+    assert q.status_code == 201, q.text
+    assert q.json()["chart"] == old  # older specs are stored and returned unchanged
+    rich = {
+        "type": "hbar",
+        "x": "category",
+        "y": ["sales"],
+        "agg": "avg",
+        "color": "brand",
+        "facet": "@measures",
+        "barmode": "percent",
+        "sort": "desc",
+        "filters": [{"column": "brand", "values": ["A", 3, None, True]}],
+    }
+    r = client.patch(f"/v1/queries/{q.json()['id']}", json={"base_version": 1, "chart": rich}, headers=owner)
+    assert r.status_code == 200, r.text
+    assert r.json()["chart"] == rich
+    bad = {**rich, "type": "pie"}
+    assert (
+        client.patch(
+            f"/v1/queries/{q.json()['id']}", json={"base_version": 2, "chart": bad}, headers=owner
+        ).status_code
+        == 422
+    )

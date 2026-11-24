@@ -147,6 +147,7 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
             engine={engine}
             onSaved={onSaved}
             onDirtyChange={setQueryDirty}
+            onNew={() => openQuery(null)}
             compact
             aside={
               currentId && (

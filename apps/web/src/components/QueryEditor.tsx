@@ -15,12 +15,14 @@ type Props = {
   /** Workspace mode: called after a save instead of changing the address to the query page. */
   onSaved?: (q: SavedQuery, isNew: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Workspace mode: start a new, empty query. */
+  onNew?: () => void;
   /** Shown under the description (e.g. which notes use this query). */
   aside?: React.ReactNode;
   compact?: boolean;
 };
 
-export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, aside, compact }: Props) {
+export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, onNew, aside, compact }: Props) {
   const [id, setId] = useState(query?.id ?? null);
   const [version, setVersion] = useState(query?.version ?? null);
   const [name, setName] = useState(query?.name ?? "");
@@ -65,11 +67,14 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
   }, [sql, running, engine]);
 
   const save = useCallback(
-    async (baseVersion = version) => {
+    async (baseVersion = version, asNew = false) => {
       setSaving(true);
       setSaveMsg(null);
-      const fields = { name, description, sql, chart };
-      const res = await saveQuery(projectId, id, baseVersion, fields);
+      const sameName = !!query && name.trim() === query.name.trim();
+      const fields = { name: asNew && sameName ? `${name.trim()} (copy)` : name, description, sql, chart };
+      if (fields.name !== name) setName(fields.name);
+      const targetId = asNew ? null : id;
+      const res = await saveQuery(projectId, targetId, asNew ? null : baseVersion, fields);
       setSaving(false);
       if (res.ok) {
         setSnapshot(JSON.stringify(fields));
@@ -77,10 +82,10 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
         setConflictVersion(null);
         setSaveMsg({ ok: true, text: `Saved · v${res.version} · ${ago(res.updated_at)}` });
         if (onSaved) {
-          if (!id) setId(res.id);
+          if (!targetId) setId(res.id);
           onSaved(
             {
-              ...(query ?? { project_id: projectId, created_at: res.updated_at }),
+              ...(query && !asNew ? query : { project_id: projectId, created_at: res.updated_at }),
               ...fields,
               name: fields.name.trim() || "Untitled query",
               id: res.id,
@@ -88,9 +93,9 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
               updated_at: res.updated_at,
               last_edited_by: res.last_edited_by,
             },
-            !id,
+            !targetId,
           );
-        } else if (!id) {
+        } else if (!targetId) {
           setId(res.id);
           // Update the address without navigating, so the result and chart on screen stay.
           window.history.replaceState(null, "", `/lab/projects/${projectId}/queries/${res.id}`);
@@ -137,9 +142,13 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
 
   return (
     <div>
+      <label htmlFor="query-name" className="hint mb-1 block">
+        Query name · click to rename, then Save
+      </label>
       <input
+        id="query-name"
         aria-label="Query name"
-        className={`w-full bg-transparent font-bold leading-tight tracking-tight outline-none placeholder:text-muted focus-visible:outline-2 ${compact ? "text-[20px]" : "text-[26px]"}`}
+        className={`w-full rounded-md border border-dashed border-line bg-transparent px-2 py-1 font-bold leading-tight tracking-tight outline-none placeholder:text-muted hover:border-muted focus:border-solid focus:border-accent ${compact ? "text-[20px]" : "text-[26px]"}`}
         value={name}
         maxLength={200}
         placeholder="Name this query"
@@ -189,6 +198,22 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
         <button type="button" className="btn btn-quiet" onClick={() => void save()} disabled={saving || (!dirty && !!id)}>
           {saving ? "Saving…" : id ? "Save" : "Save query"}
         </button>
+        {id && (
+          <button
+            type="button"
+            className="btn btn-quiet"
+            onClick={() => void save(null, true)}
+            disabled={saving}
+            title="Save a copy under the name above and keep the original"
+          >
+            Save as new
+          </button>
+        )}
+        {id && onNew && (
+          <button type="button" className="btn btn-quiet" onClick={onNew}>
+            + New query
+          </button>
+        )}
         <span className="hint hidden sm:inline">⌘/Ctrl+Enter to run · ⌘/Ctrl+S to save</span>
         {statements > 1 && (
           <span className="hint w-full">Charts, links and the dashboard use the first statement of a saved query.</span>

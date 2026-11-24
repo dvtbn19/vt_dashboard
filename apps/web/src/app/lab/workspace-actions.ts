@@ -94,6 +94,7 @@ export async function saveQuery(
       : await api<SavedQuery>(`/v1/projects/${projectId}/queries`, { method: "POST", body: JSON.stringify(body) });
     revalidatePath(`/lab/projects/${projectId}`);
     revalidatePath(`/lab/projects/${projectId}/dashboard`);
+    revalidatePath(`/lab/projects/${projectId}/workspace`);
     return { ok: true, id: q.id, version: q.version, updated_at: q.updated_at, last_edited_by: q.last_edited_by };
   } catch (err) {
     if (isRedirect(err)) throw err;

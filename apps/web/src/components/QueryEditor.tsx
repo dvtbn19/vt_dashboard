@@ -47,6 +47,59 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
 
+  // Unsaved edits are mirrored to this browser, so a reload (e.g. right after a new deploy) never loses them.
+  const draftKey = useCallback((qid: string | null) => `vtlab:query-draft:${projectId}:${qid ?? "new"}`, [projectId]);
+  const [restoredAt, setRestoredAt] = useState<string | null>(null);
+  const firstDraftWrite = useRef(true);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(draftKey(query?.id ?? null));
+      if (!raw) return;
+      const d = JSON.parse(raw) as { name: string; description: string; sql: string; chart: ChartSpec | null; at: string };
+      if (JSON.stringify({ name: d.name, description: d.description, sql: d.sql, chart: d.chart }) === snapshot) return;
+      /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from browser storage, only available after mount */
+      setName(d.name);
+      setDescription(d.description);
+      setSql(d.sql);
+      setChart(d.chart);
+      setRestoredAt(d.at);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } catch {
+      /* storage unavailable or malformed: start from the saved query */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
+  }, []);
+  useEffect(() => {
+    if (firstDraftWrite.current) {
+      firstDraftWrite.current = false;
+      return;
+    }
+    const key = draftKey(id);
+    const t = window.setTimeout(() => {
+      try {
+        if (dirty) window.localStorage.setItem(key, JSON.stringify({ name, description, sql, chart, at: new Date().toISOString() }));
+        else window.localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [name, description, sql, chart, dirty, id, draftKey]);
+
+  const discardDraft = () => {
+    const s0 = JSON.parse(snapshot) as { name: string; description: string; sql: string; chart: ChartSpec | null };
+    setName(s0.name);
+    setDescription(s0.description);
+    setSql(s0.sql);
+    setChart(s0.chart);
+    setRestoredAt(null);
+    try {
+      window.localStorage.removeItem(draftKey(id));
+    } catch {
+      /* ignore */
+    }
+  };
+
   const run = useCallback(async () => {
     if (!sql.trim() || running) return;
     // Run the selection, or the statement under the cursor when the editor holds several.
@@ -78,6 +131,13 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
       setSaving(false);
       if (res.ok) {
         setSnapshot(JSON.stringify(fields));
+        setRestoredAt(null);
+        try {
+          window.localStorage.removeItem(draftKey(targetId));
+          window.localStorage.removeItem(draftKey(res.id));
+        } catch {
+          /* ignore */
+        }
         setVersion(res.version);
         setConflictVersion(null);
         setSaveMsg({ ok: true, text: `Saved · v${res.version} · ${ago(res.updated_at)}` });
@@ -105,7 +165,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
         setSaveMsg({ ok: false, text: res.error });
       }
     },
-    [version, name, description, sql, chart, projectId, id, onSaved, query],
+    [version, name, description, sql, chart, projectId, id, onSaved, query, draftKey],
   );
 
   useEffect(() => {
@@ -164,6 +224,16 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
         onChange={(e) => setDescription(e.target.value)}
       />
       {aside}
+      {restoredAt && dirty && (
+        <div role="status" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-accent/40 bg-accent/8 px-3 py-2 text-[14px]">
+          <span>
+            Restored your unsaved changes from {ago(restoredAt)}. <strong>Save</strong> to keep them.
+          </span>
+          <button type="button" className="text-muted underline hover:text-fail" onClick={discardDraft}>
+            Discard
+          </button>
+        </div>
+      )}
 
       {engine && !engine.configured && (
         <p role="status" className="mt-3 rounded-lg bg-run/10 px-3 py-2 text-[14.5px] text-run">

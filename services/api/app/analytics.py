@@ -100,6 +100,64 @@ def strip_trailing(sql: str) -> str:
     return sql.strip()
 
 
+_DOLLAR = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)?\$")
+
+
+def split_statements(sql: str) -> list[str]:
+    """Statements at top-level `;`, skipping strings, quoted identifiers, $tag$ quotes and comments.
+
+    Comment-only pieces are dropped. Mirrors apps/web/src/lib/sqlStatements.ts.
+    """
+    out: list[str] = []
+    start, i, n, has_code = 0, 0, len(sql), False
+
+    def push(end: int) -> None:
+        if has_code:
+            out.append(sql[start:end])
+
+    while i < n:
+        c, nxt = sql[i], sql[i + 1] if i + 1 < n else ""
+        if c == "-" and nxt == "-":
+            nl = sql.find("\n", i)
+            i = n if nl == -1 else nl + 1
+        elif c == "/" and nxt == "*":
+            depth, i = 1, i + 2
+            while i < n and depth:
+                if sql.startswith("/*", i):
+                    depth, i = depth + 1, i + 2
+                elif sql.startswith("*/", i):
+                    depth, i = depth - 1, i + 2
+                else:
+                    i += 1
+        elif c in "'\"":
+            has_code, i = True, i + 1
+            while i < n:
+                if sql[i] == c:
+                    if i + 1 < n and sql[i + 1] == c:
+                        i += 2
+                        continue
+                    break
+                i += 1
+            i += 1
+        elif c == "$":
+            has_code = True
+            m = _DOLLAR.match(sql, i)
+            if m:
+                close = sql.find(m.group(0), m.end())
+                i = n if close == -1 else close + len(m.group(0))
+            else:
+                i += 1
+        elif c == ";":
+            push(i)
+            start, i, has_code = i + 1, i + 1, False
+        else:
+            if not c.isspace():
+                has_code = True
+            i += 1
+    push(n)
+    return out
+
+
 def run_readonly(sql: str, max_rows: int) -> dict[str, Any]:
     settings = get_settings()
     engine = get_analytics_engine()

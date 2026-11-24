@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ResultView } from "./ResultView";
 import { deleteQuery, runSql, saveQuery } from "@/app/lab/workspace-actions";
 import { ago } from "@/lib/format";
 import { defaultChart, usableChart } from "@/lib/queryResult";
+import { countStatements, pickStatement } from "@/lib/sqlStatements";
 import type { ChartSpec, QueryEngine, QueryResult, SavedQuery } from "@/lib/types";
 
 type Props = {
@@ -24,11 +25,13 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
   const [version, setVersion] = useState(query?.version ?? null);
   const [name, setName] = useState(query?.name ?? "");
   const [description, setDescription] = useState(query?.description ?? "");
-  const [sql, setSql] = useState(query?.sql ?? "-- One read-only query. Aggregate in SQL for big tables.\nselect current_date as today");
+  const [sql, setSql] = useState(query?.sql ?? "-- Read-only. Several statements? Run executes the one at the cursor (or the selection).\nselect current_date as today");
   const [chart, setChart] = useState<ChartSpec | null>(query?.chart ?? null);
   const [result, setResult] = useState<QueryResult | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [ranLabel, setRanLabel] = useState<string | null>(null);
+  const sqlRef = useRef<HTMLTextAreaElement>(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [conflictVersion, setConflictVersion] = useState<number | null>(null);
@@ -36,6 +39,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
   const [snapshot, setSnapshot] = useState(() => JSON.stringify({ name, description, sql, chart }));
   const dirty = JSON.stringify({ name, description, sql, chart }) !== snapshot;
   const canRun = engine?.configured !== false;
+  const statements = useMemo(() => countStatements(sql), [sql]);
 
   useEffect(() => {
     onDirtyChange?.(dirty);
@@ -43,9 +47,14 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
 
   const run = useCallback(async () => {
     if (!sql.trim() || running) return;
+    // Run the selection, or the statement under the cursor when the editor holds several.
+    const el = sqlRef.current;
+    const picked = pickStatement(sql, el?.selectionStart ?? 0, el?.selectionEnd ?? 0);
+    if (el && picked.range) el.setSelectionRange(picked.range[0], picked.range[1]);
     setRunning(true);
     setRunError(null);
-    const res = await runSql(sql, engine?.max_rows ? Math.min(engine.max_rows, 5000) : 1000);
+    setRanLabel(picked.label);
+    const res = await runSql(picked.sql, engine?.max_rows ? Math.min(engine.max_rows, 5000) : 1000);
     setRunning(false);
     if (res.ok) {
       setResult(res.result);
@@ -155,9 +164,14 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
       )}
 
       <label htmlFor="sql" className="label mt-4">
-        SQL <span className="hint font-normal">· read-only, one statement, {engine?.timeout_seconds ?? 20}s limit</span>
+        SQL{" "}
+        <span className="hint font-normal">
+          · read-only, {engine?.timeout_seconds ?? 20}s limit
+          {statements > 1 ? ` · ${statements} statements: Run executes the one at the cursor (or your selection)` : ""}
+        </span>
       </label>
       <textarea
+        ref={sqlRef}
         id="sql"
         className={`field resize-y font-mono !text-[14px] leading-relaxed ${compact ? "min-h-[200px]" : "min-h-[260px]"}`}
         value={sql}
@@ -176,6 +190,9 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
           {saving ? "Saving…" : id ? "Save" : "Save query"}
         </button>
         <span className="hint hidden sm:inline">⌘/Ctrl+Enter to run · ⌘/Ctrl+S to save</span>
+        {statements > 1 && (
+          <span className="hint w-full">Charts, links and the dashboard use the first statement of a saved query.</span>
+        )}
         {saveMsg && (
           <span role="status" className={`text-[13.5px] ${saveMsg.ok ? "text-muted" : "text-fail"}`}>
             {saveMsg.ok && dirty ? "Unsaved changes" : saveMsg.text}
@@ -203,6 +220,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
             {runError}
           </pre>
         )}
+        {ranLabel && (result || runError) && <p className="mb-2 text-[13.5px] text-muted">Ran {ranLabel}</p>}
         {result ? (
           <ResultView result={result} name={name || "query"} spec={chart} onSpecChange={setChart} />
         ) : (

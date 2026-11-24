@@ -278,3 +278,30 @@ def test_note_links_to_queries(client: TestClient, owner, project):
     # A body-only update keeps the links.
     r = client.patch(f"/v1/notes/{note['id']}", json={"base_version": 2, "body": "x"}, headers=owner)
     assert r.json()["links"] == [{"query_id": q2["id"], "section": ""}]
+
+
+def test_split_statements():
+    from app.analytics import split_statements
+
+    sql = "-- head\nselect 1 as a;\n\nselect ';' as b, $x$ ; $x$ as c /* ; */;\n-- tail ; c\n"
+    assert [s.strip() for s in split_statements(sql)] == [
+        "-- head\nselect 1 as a",
+        "select ';' as b, $x$ ; $x$ as c /* ; */",
+    ]
+    assert len(split_statements("select 'it''s;' ; select \"a;b\"")) == 2
+    assert len(split_statements("/* a /* nested ; */ ; */ select 1")) == 1
+    assert split_statements("-- only a comment;\n") == []
+
+
+def test_saved_query_with_several_statements_runs_the_first(
+    client: TestClient, owner, project, analytics_table
+):
+    sql = f"select count(*) as n from {analytics_table};\n\n-- scratch\nselect 'second' as x;\n"
+    q = client.post(
+        f"/v1/projects/{project['id']}/queries", json={"name": "multi", "sql": sql}, headers=owner
+    ).json()
+    r = client.post(f"/v1/queries/{q['id']}/run", headers=owner)
+    assert r.status_code == 200, r.text
+    assert r.json()["columns"] == ["n"] and r.json()["rows"][0][0] == 120
+    # Ad-hoc runs stay strictly one statement.
+    assert client.post("/v1/queries/run", json={"sql": sql}, headers=owner).status_code == 400

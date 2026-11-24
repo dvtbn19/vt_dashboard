@@ -180,6 +180,9 @@ def run_saved(
     max_rows: int = Query(default=1000, ge=1, le=5000),
 ) -> QueryResult:
     q = get_query_for(db, principal, query_id)
-    sql = q.sql
+    # A saved query may hold several statements (the editor runs one at a time); the saved
+    # query's result, as used by charts and the dashboard, is its first statement.
+    statements = analytics.split_statements(q.sql)
+    sql = statements[0] if statements else q.sql
     db.close()  # do not hold a metadata DB connection while the analytics query runs
     return _execute(sql, max_rows)

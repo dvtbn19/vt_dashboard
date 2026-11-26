@@ -49,7 +49,14 @@ A query's `chart`: `{type: bar|hbar|line|area|scatter, x, y: [measures]}` plus o
 | GET | `/v1/queries/engine` | user | `{configured, timeout_seconds, max_rows}` |
 | POST | `/v1/queries/run` | **user only** | `{sql, max_rows≤5000}` → `{columns, rows, row_count, truncated, elapsed_ms}`; 400 with the database message; 503 if `ANALYTICS_DATABASE_URL` is unset |
 | POST | `/v1/queries/{id}/run?max_rows=` | **user only** | runs a saved query; if its SQL holds several statements (the editor runs one at a time, at the cursor or selection), the first one runs |
+| GET | `/v1/projects/{id}/notebook` | user, agent `read` | the workspace notebook: `{cells, version, last_edited_by, updated_at}`; `version: 0` and `cells: []` when none saved yet |
+| PUT | `/v1/projects/{id}/notebook` | user, agent `queries:write` | `{base_version, cells}` replaces the cell order (`base_version: 0` creates it); **409** `{message, current_version}` if it changed |
 | GET | `/v1/public/projects`, `/v1/public/projects/{slug}` | anyone | only `visibility=public`; no ids, runs or files |
+
+Notebook `cells` (max 500): `{type: "sql", query_id}` (a saved query of the project, which holds the
+SQL and chart) or `{type: "markdown", id, text}` (`id` matches `[A-Za-z0-9_-]{1,64}`; `#` headings make
+the Lab's table of contents). Unknown or repeated query ids are dropped; deleted queries disappear on
+read. Saved queries missing from `cells` are shown after them, in creation order.
 
 Artifact states: `pending_upload → ready | failed`. Run states: `running → completed | failed`.
 

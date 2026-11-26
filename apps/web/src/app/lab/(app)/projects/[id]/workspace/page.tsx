@@ -2,7 +2,7 @@ import { ProblemState } from "@/components/ProblemState";
 import { Workspace } from "@/components/Workspace";
 import { api } from "@/lib/api";
 import { attempt } from "@/lib/attempt";
-import type { Note, NoteListItem, Project, QueryEngine, SavedQuery } from "@/lib/types";
+import type { Note, Notebook, NoteListItem, Project, QueryEngine, SavedQuery } from "@/lib/types";
 
 export const metadata = { title: "Workspace" };
 
@@ -30,11 +30,15 @@ export default async function WorkspacePage({
       api<QueryEngine>("/v1/queries/engine"),
     ]);
     const chosen = pickNote(notes, sp.note);
-    const note = chosen ? await api<Note>(`/v1/notes/${chosen.id}`) : null;
-    return { project, queries, notes, engine, note };
+    const [note, notebook] = await Promise.all([
+      chosen ? api<Note>(`/v1/notes/${chosen.id}`) : Promise.resolve(null),
+      // Missing until migration 0005 is applied: the notebook then falls back to creation order.
+      api<Notebook>(`/v1/projects/${id}/notebook`).catch(() => null),
+    ]);
+    return { project, queries, notes, engine, note, notebook };
   });
   if (!res.ok) return <ProblemState problem={res.problem} />;
-  const { project, queries, notes, engine, note } = res.data;
+  const { project, queries, notes, engine, note, notebook } = res.data;
   // A notebook shows every query; ?query= only says which cell to scroll to.
   const initialQuery = queries.find((q) => q.id === sp.query)?.id ?? null;
   return (
@@ -45,6 +49,7 @@ export default async function WorkspacePage({
       notes={notes}
       note={note}
       engine={engine}
+      notebook={notebook}
       initialQueryId={initialQuery}
     />
   );

@@ -185,3 +185,20 @@ class SavedQuery(TimestampMixin, Base):
     )  # {"type": "bar"|"line", "x": col, "y": [cols]}
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+
+
+class Notebook(TimestampMixin, Base):
+    """The workspace notebook of a project: the order of its cells.
+
+    `cells` is a list of {"type": "sql", "query_id": "<uuid>"} (a saved query, which holds the SQL and
+    chart) and {"type": "markdown", "id": "<client id>", "text": "..."}. Saved queries missing from the
+    list are shown after it, so queries made through the API still appear. One per project.
+    """
+
+    __tablename__ = "notebooks"
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    cells: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)

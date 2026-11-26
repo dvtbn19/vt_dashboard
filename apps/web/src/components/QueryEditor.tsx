@@ -25,7 +25,24 @@ export type CellOptions = {
   runAllSignal: number;
   /** Put the cursor in the SQL on mount (a freshly added cell). */
   autoFocus?: boolean;
+  /** More buttons in the cell header (e.g. move up/down). */
+  actions?: React.ReactNode;
 };
+
+/**
+ * Compare query content without noise: a chart re-checked after a run gains `color: null`,
+ * `filters: []` and so on, which must not count as an unsaved change.
+ */
+function fingerprint(f: QueryFields): string {
+  const chart = f.chart
+    ? Object.fromEntries(
+        Object.entries(f.chart)
+          .filter(([, v]) => v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0 && v !== f.chart?.y))
+          .sort(([a], [b]) => a.localeCompare(b)),
+      )
+    : null;
+  return JSON.stringify({ name: f.name, description: f.description, sql: f.sql, chart });
+}
 
 /**
  * Cells run one at a time (auto-run on open and "Run all"), so a long notebook never opens a burst of
@@ -81,9 +98,9 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   // A new cell's starting content counts as unsaved (a duplicate must not vanish on reload).
   const [snapshot, setSnapshot] = useState(() =>
-    JSON.stringify(cell?.initial && !query ? { name: "", description: "", sql: "", chart: null } : { name, description, sql, chart }),
+    fingerprint(cell?.initial && !query ? { name: "", description: "", sql: "", chart: null } : { name, description, sql, chart }),
   );
-  const dirty = JSON.stringify({ name, description, sql, chart }) !== snapshot;
+  const dirty = fingerprint({ name, description, sql, chart }) !== snapshot;
   const canRun = engine?.configured !== false;
   const statements = useMemo(() => countStatements(sql), [sql]);
 
@@ -101,7 +118,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
       const raw = window.localStorage.getItem(draftKey(query?.id ?? null));
       if (!raw) return;
       const d = JSON.parse(raw) as { name: string; description: string; sql: string; chart: ChartSpec | null; at: string };
-      if (JSON.stringify({ name: d.name, description: d.description, sql: d.sql, chart: d.chart }) === snapshot) return;
+      if (fingerprint(d) === snapshot) return;
       /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from browser storage, only available after mount */
       setName(d.name);
       setDescription(d.description);
@@ -206,7 +223,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
       const res = await saveQuery(projectId, targetId, asNew ? null : baseVersion, fields);
       setSaving(false);
       if (res.ok) {
-        setSnapshot(JSON.stringify(fields));
+        setSnapshot(fingerprint(fields));
         setRestoredAt(null);
         try {
           window.localStorage.removeItem(draftKey(targetId));
@@ -306,6 +323,7 @@ export function QueryEditor({ projectId, query, engine, onSaved, onDirtyChange, 
             [{cell.index}]{dirty ? " · unsaved" : ""}
           </span>
           <div className="flex items-center gap-1">
+            {cell.actions}
             <button
               type="button"
               className="rounded-md px-2 py-1 text-[13px] text-muted hover:bg-sunken hover:text-ink"

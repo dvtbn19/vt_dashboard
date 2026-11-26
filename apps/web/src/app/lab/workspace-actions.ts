@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError, ApiUnavailable } from "@/lib/api";
 import { NOTE_TEMPLATES, type NoteTemplate } from "@/lib/templates";
-import type { ChartSpec, Note, NoteLink, QueryResult, SavedQuery } from "@/lib/types";
+import type { ChartSpec, Note, NoteLink, Notebook, NotebookCell, QueryResult, SavedQuery } from "@/lib/types";
 
 export type SaveResult =
   | { ok: true; version: number; updated_at: string; last_edited_by: string; id: string }
@@ -106,6 +106,26 @@ export async function deleteQuery(id: string, projectId: string) {
   await api(`/v1/queries/${id}`, { method: "DELETE" });
   revalidatePath(`/lab/projects/${projectId}`);
   redirect(`/lab/projects/${projectId}`);
+}
+
+// ------------------------------------------------------------------ notebook
+
+export type NotebookSaveResult =
+  | { ok: true; version: number }
+  | { ok: false; error: string; conflict?: { current_version: number } };
+
+/** Save the workspace notebook's cell order and Markdown cells (no revalidation: the page holds the state). */
+export async function saveNotebook(projectId: string, baseVersion: number, cells: NotebookCell[]): Promise<NotebookSaveResult> {
+  try {
+    const nb = await api<Notebook>(`/v1/projects/${projectId}/notebook`, {
+      method: "PUT",
+      body: JSON.stringify({ base_version: baseVersion, cells }),
+    });
+    return { ok: true, version: nb.version };
+  } catch (err) {
+    if (isRedirect(err)) throw err;
+    return failure(err);
+  }
 }
 
 /** Delete a saved query and stay on the page (notebook cells). */

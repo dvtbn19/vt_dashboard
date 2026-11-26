@@ -336,3 +336,70 @@ def test_chart_spec_round_trip(client: TestClient, owner, project):
         ).status_code
         == 422
     )
+
+
+# --- workspace notebook ------------------------------------------------------------------
+
+
+def test_notebook_order_markdown_and_conflict(client: TestClient, owner, project):
+    pid = project["id"]
+    empty = client.get(f"/v1/projects/{pid}/notebook", headers=owner).json()
+    assert empty["version"] == 0 and empty["cells"] == []
+
+    q1 = client.post(
+        f"/v1/projects/{pid}/queries", json={"name": "nb q1", "sql": "select 1"}, headers=owner
+    ).json()
+    q2 = client.post(
+        f"/v1/projects/{pid}/queries", json={"name": "nb q2", "sql": "select 2"}, headers=owner
+    ).json()
+    cells = [
+        {"type": "markdown", "id": "intro", "text": "# Range review\n## Coffee"},
+        {"type": "sql", "query_id": q2["id"]},
+        {"type": "sql", "query_id": q1["id"]},
+        {"type": "sql", "query_id": q1["id"]},  # duplicate: dropped
+        {"type": "sql", "query_id": "00000000-0000-0000-0000-000000000000"},  # unknown: dropped
+    ]
+    r = client.put(f"/v1/projects/{pid}/notebook", json={"base_version": 0, "cells": cells}, headers=owner)
+    assert r.status_code == 200, r.text
+    nb = r.json()
+    assert nb["version"] == 1
+    assert [c.get("query_id") or c["id"] for c in nb["cells"]] == ["intro", q2["id"], q1["id"]]
+    assert nb["cells"][0]["text"].startswith("# Range review")
+
+    # A stale editor cannot overwrite; creating twice is a conflict too.
+    assert (
+        client.put(
+            f"/v1/projects/{pid}/notebook", json={"base_version": 0, "cells": []}, headers=owner
+        ).status_code
+        == 409
+    )
+    r = client.put(
+        f"/v1/projects/{pid}/notebook", json={"base_version": 1, "cells": cells[:2]}, headers=owner
+    )
+    assert r.status_code == 200 and r.json()["version"] == 2
+    stale = client.put(f"/v1/projects/{pid}/notebook", json={"base_version": 1, "cells": []}, headers=owner)
+    assert stale.status_code == 409 and stale.json()["detail"]["current_version"] == 2
+
+    # Deleting a query removes it from the order on read.
+    assert client.delete(f"/v1/queries/{q2['id']}", headers=owner).status_code == 204
+    assert [c["type"] for c in client.get(f"/v1/projects/{pid}/notebook", headers=owner).json()["cells"]] == [
+        "markdown"
+    ]
+
+    bad = client.put(
+        f"/v1/projects/{pid}/notebook",
+        json={"base_version": 2, "cells": [{"type": "markdown", "id": "has space", "text": ""}]},
+        headers=owner,
+    )
+    assert bad.status_code == 422
+
+
+def test_notebook_access_control(client: TestClient, owner, other, project):
+    pid = project["id"]
+    assert client.get(f"/v1/projects/{pid}/notebook", headers=other).status_code == 404
+    assert (
+        client.put(
+            f"/v1/projects/{pid}/notebook", json={"base_version": 0, "cells": []}, headers=other
+        ).status_code
+        == 404
+    )

@@ -165,3 +165,7 @@ export type SavedQuery = SavedQueryListItem & { sql: string; chart: ChartSpec | 
 export type Cell = string | number | boolean | null | Cell[] | { [k: string]: Cell };
 export type QueryResult = { columns: string[]; rows: Cell[][]; row_count: number; truncated: boolean; elapsed_ms: number };
 export type QueryEngine = { configured: boolean; timeout_seconds: number; max_rows: number };
+
+/** Workspace notebook: the order of SQL cells (saved queries) and Markdown cells. */
+export type NotebookCell = { type: "sql"; query_id: string } | { type: "markdown"; id: string; text: string };
+export type Notebook = { project_id: string; cells: NotebookCell[]; version: number; last_edited_by: string; updated_at: string | null };

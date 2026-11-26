@@ -462,3 +462,38 @@ class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+
+
+# --- workspace notebook ---------------------------------------------------------------
+
+NOTEBOOK_CELLS_MAX = 500
+MARKDOWN_CELL_MAX = 100_000
+
+
+class SqlCell(BaseModel):
+    type: Literal["sql"]
+    query_id: uuid.UUID
+
+
+class MarkdownCell(BaseModel):
+    type: Literal["markdown"]
+    id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    text: str = Field(default="", max_length=MARKDOWN_CELL_MAX)
+
+
+NotebookCell = Annotated[SqlCell | MarkdownCell, Field(discriminator="type")]
+
+
+class NotebookUpdate(BaseModel):
+    base_version: int = Field(
+        ge=0, description="The version you started from; 0 when the project has no notebook yet"
+    )
+    cells: list[NotebookCell] = Field(max_length=NOTEBOOK_CELLS_MAX)
+
+
+class NotebookOut(BaseModel):
+    project_id: uuid.UUID
+    cells: list[NotebookCell]
+    version: int = Field(description="0 when nothing has been saved yet")
+    last_edited_by: str = ""
+    updated_at: datetime | None = None

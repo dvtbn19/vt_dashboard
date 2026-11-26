@@ -108,6 +108,19 @@ export async function deleteQuery(id: string, projectId: string) {
   redirect(`/lab/projects/${projectId}`);
 }
 
+/** Delete a saved query and stay on the page (notebook cells). */
+export async function removeQuery(id: string, projectId: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await api(`/v1/queries/${id}`, { method: "DELETE" });
+    revalidatePath(`/lab/projects/${projectId}`);
+    revalidatePath(`/lab/projects/${projectId}/dashboard`);
+    return { ok: true };
+  } catch (err) {
+    if (isRedirect(err)) throw err;
+    return { ok: false, error: errorText(err) };
+  }
+}
+
 export async function runSql(sql: string, maxRows = 1000): Promise<RunResult> {
   try {
     const result = await api<QueryResult>("/v1/queries/run", {

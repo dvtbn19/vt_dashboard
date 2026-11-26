@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { PlotlyChart } from "./PlotlyChart";
 import { AGG_LABEL, MEASURES, buildChart, distinctValues, key, numericColumns } from "@/lib/chart";
 import { downloadCsv, formatCell } from "@/lib/queryResult";
@@ -130,6 +130,7 @@ export function ChartPicker({
   spec: ChartSpec | null;
   onChange: (s: ChartSpec | null) => void;
 }) {
+  const uid = useId(); // several pickers can share a page (notebook cells)
   const nums = numericColumns(result);
   const current: ChartSpec = spec ?? { type: "bar", x: result.columns[0], y: [], agg: "sum" };
   const set = (patch: Partial<ChartSpec>) => {
@@ -157,8 +158,8 @@ export function ChartPicker({
         ))}
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Shelf label={current.type === "hbar" ? "Rows (dimension)" : "X / Columns"} htmlFor="cx">
-          <select className={sel} id="cx" value={current.x} onChange={(e) => set({ x: e.target.value })}>
+        <Shelf label={current.type === "hbar" ? "Rows (dimension)" : "X / Columns"} htmlFor={`${uid}-cx`}>
+          <select className={sel} id={`${uid}-cx`} value={current.x} onChange={(e) => set({ x: e.target.value })}>
             {result.columns.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -166,8 +167,8 @@ export function ChartPicker({
             ))}
           </select>
         </Shelf>
-        <Shelf label="Aggregate" htmlFor="cagg">
-          <select className={sel} id="cagg" value={current.agg ?? "none"} onChange={(e) => set({ agg: e.target.value as ChartAgg })}>
+        <Shelf label="Aggregate" htmlFor={`${uid}-cagg`}>
+          <select className={sel} id={`${uid}-cagg`} value={current.agg ?? "none"} onChange={(e) => set({ agg: e.target.value as ChartAgg })}>
             {(Object.keys(AGG_LABEL) as ChartAgg[]).map((a) => (
               <option key={a} value={a}>
                 {AGG_LABEL[a]}
@@ -175,8 +176,8 @@ export function ChartPicker({
             ))}
           </select>
         </Shelf>
-        <Shelf label="Color by" htmlFor="ccolor">
-          <select className={sel} id="ccolor" value={current.color ?? ""} onChange={(e) => set({ color: e.target.value || null })}>
+        <Shelf label="Color by" htmlFor={`${uid}-ccolor`}>
+          <select className={sel} id={`${uid}-ccolor`} value={current.color ?? ""} onChange={(e) => set({ color: e.target.value || null })}>
             <option value="">None</option>
             {dims
               .filter((c) => c !== current.x)
@@ -187,8 +188,8 @@ export function ChartPicker({
               ))}
           </select>
         </Shelf>
-        <Shelf label="Split into charts by" htmlFor="cfacet">
-          <select className={sel} id="cfacet" value={current.facet ?? ""} onChange={(e) => set({ facet: e.target.value || null })}>
+        <Shelf label="Split into charts by" htmlFor={`${uid}-cfacet`}>
+          <select className={sel} id={`${uid}-cfacet`} value={current.facet ?? ""} onChange={(e) => set({ facet: e.target.value || null })}>
             <option value="">None</option>
             {current.y.length > 1 && <option value={MEASURES}>Each measure</option>}
             {dims
@@ -201,16 +202,16 @@ export function ChartPicker({
           </select>
         </Shelf>
         {stackable && (
-          <Shelf label="Bars" htmlFor="cmode">
-            <select className={sel} id="cmode" value={current.barmode ?? "group"} onChange={(e) => set({ barmode: e.target.value as ChartSpec["barmode"] })}>
+          <Shelf label="Bars" htmlFor={`${uid}-cmode`}>
+            <select className={sel} id={`${uid}-cmode`} value={current.barmode ?? "group"} onChange={(e) => set({ barmode: e.target.value as ChartSpec["barmode"] })}>
               <option value="group">{current.type === "area" ? "Stacked" : "Side by side"}</option>
               {current.type !== "area" && <option value="stack">Stacked</option>}
               <option value="percent">100% stacked</option>
             </select>
           </Shelf>
         )}
-        <Shelf label="Sort" htmlFor="csort">
-          <select className={sel} id="csort" value={current.sort ?? "none"} onChange={(e) => set({ sort: e.target.value as ChartSpec["sort"] })}>
+        <Shelf label="Sort" htmlFor={`${uid}-csort`}>
+          <select className={sel} id={`${uid}-csort`} value={current.sort ?? "none"} onChange={(e) => set({ sort: e.target.value as ChartSpec["sort"] })}>
             <option value="none">Data order</option>
             <option value="desc">Largest first</option>
             <option value="asc">Smallest first</option>

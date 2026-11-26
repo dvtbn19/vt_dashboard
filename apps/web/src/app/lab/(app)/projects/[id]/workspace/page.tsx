@@ -35,7 +35,8 @@ export default async function WorkspacePage({
   });
   if (!res.ok) return <ProblemState problem={res.problem} />;
   const { project, queries, notes, engine, note } = res.data;
-  const initialQuery = queries.find((q) => q.id === sp.query)?.id ?? (sp.query === "new" ? null : (queries[0]?.id ?? null));
+  // A notebook shows every query; ?query= only says which cell to scroll to.
+  const initialQuery = queries.find((q) => q.id === sp.query)?.id ?? null;
   return (
     <Workspace
       key={note ? `${note.id}:${note.version}` : "none"}

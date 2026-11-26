@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { NoteForm } from "./NoteForm";
 import { Notebook } from "./Notebook";
 import { createNote } from "@/app/lab/workspace-actions";
@@ -19,6 +19,8 @@ type Props = {
   initialQueryId: string | null;
 };
 
+const NOTE_PANEL_KEY = "vtlab:workspace-note-panel";
+
 /** Notebook of SQL cells on the left (each with its own result and chart), the working note on the right; on phones, two tabs. */
 export function Workspace({ project, queries: initialQueries, notes, note, engine, notebook, initialQueryId }: Props) {
   const router = useRouter();
@@ -26,6 +28,25 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
   const [currentId, setCurrentId] = useState<string | null>(initialQueryId);
   const [noteLinks, setNoteLinks] = useState<NoteLink[]>(note?.links ?? []);
   const [tab, setTab] = useState<"sql" | "note">("sql");
+  // Desktop: the note panel can be hidden so the notebook gets the full width (remembered in this browser).
+  const [noteOpen, setNoteOpen] = useState(true);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- browser storage is only readable after mount
+      if (window.localStorage.getItem(NOTE_PANEL_KEY) === "hidden") setNoteOpen(false);
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const toggleNote = () => {
+    const next = !noteOpen;
+    setNoteOpen(next);
+    try {
+      window.localStorage.setItem(NOTE_PANEL_KEY, next ? "shown" : "hidden");
+    } catch {
+      /* ignore */
+    }
+  };
 
   const current = queries.find((q) => q.id === currentId) ?? null;
   const setAddress = useCallback(
@@ -100,6 +121,16 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
           / <span className="font-semibold text-ink">Workspace</span>
         </nav>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-quiet hidden !min-h-9 !px-3 text-[14px] lg:inline-flex"
+            aria-expanded={noteOpen}
+            aria-controls="workspace-note"
+            onClick={toggleNote}
+            title={noteOpen ? "Hide the working note and give the notebook the full width" : "Show the working note beside the notebook"}
+          >
+            {noteOpen ? "Hide note ▸" : "◂ Show note"}
+          </button>
           <Link href={`/lab/projects/${project.id}/dashboard`} className="btn btn-quiet !min-h-9 !px-3 text-[14px]">
             Dashboard
           </Link>
@@ -122,11 +153,11 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
         ))}
       </div>
 
-      <div className="mt-3 grid gap-6 lg:grid-cols-2 lg:gap-0">
+      <div className={`mt-3 grid gap-6 lg:gap-0 ${noteOpen ? "lg:grid-cols-2" : "lg:grid-cols-1"}`}>
         {/* ------------------------------------------------ SQL */}
         <section
           aria-label="SQL"
-          className={`${tab === "sql" ? "" : "hidden"} min-w-0 lg:block lg:h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:border-r lg:border-line lg:pr-6`}
+          className={`${tab === "sql" ? "" : "hidden"} min-w-0 lg:block lg:h-[calc(100dvh-5.5rem)] lg:overflow-y-auto ${noteOpen ? "lg:border-r lg:border-line lg:pr-6" : ""}`}
         >
           <Notebook
             projectId={project.id}
@@ -152,6 +183,7 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
                         className="rounded-full bg-sunken px-2.5 py-1 hover:text-accent"
                         onClick={() => {
                           setTab("note");
+                          setNoteOpen(true);
                           document.querySelector(`[aria-label="${CSS.escape(u.section)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
                         }}
                       >
@@ -172,8 +204,9 @@ export function Workspace({ project, queries: initialQueries, notes, note, engin
 
         {/* ------------------------------------------------ note */}
         <section
+          id="workspace-note"
           aria-label="Note"
-          className={`${tab === "note" ? "" : "hidden"} min-w-0 lg:block lg:h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:pl-6`}
+          className={`${tab === "note" ? "" : "hidden"} min-w-0 lg:h-[calc(100dvh-5.5rem)] lg:overflow-y-auto lg:pl-6 ${noteOpen ? "lg:block" : "lg:hidden"}`}
         >
           {notes.length > 1 && note && (
             <div className="mb-2 flex items-center gap-2 pt-1">

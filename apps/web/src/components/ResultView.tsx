@@ -131,6 +131,8 @@ export function ChartPicker({
   onChange: (s: ChartSpec | null) => void;
 }) {
   const uid = useId(); // several pickers can share a page (notebook cells)
+  // A chart that is already set up starts folded to a one-line summary; a new one starts open.
+  const [open, setOpen] = useState(() => !spec);
   const nums = numericColumns(result);
   const current: ChartSpec = spec ?? { type: "bar", x: result.columns[0], y: [], agg: "sum" };
   const set = (patch: Partial<ChartSpec>) => {
@@ -141,8 +143,49 @@ export function ChartPicker({
   const filterable = result.columns.filter((c) => !filters.some((f) => f.column === c));
   const dims = result.columns.filter((c) => !current.y.includes(c));
   const stackable = current.type === "bar" || current.type === "hbar" || current.type === "area";
+  const summary = spec
+    ? [
+        MARKS.find((m) => m.type === spec.type)?.label ?? spec.type,
+        `${spec.agg && spec.agg !== "none" ? `${AGG_LABEL[spec.agg]} of ` : ""}${spec.y.join(", ")} by ${spec.x}`,
+        spec.color ? `colour: ${spec.color}` : null,
+        spec.facet ? `split: ${spec.facet === MEASURES ? "each measure" : spec.facet}` : null,
+        filters.length ? `${filters.length} filter${filters.length === 1 ? "" : "s"}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "No chart yet: choose a measure";
+  if (!open) {
+    return (
+      <button
+        type="button"
+        aria-expanded={false}
+        aria-controls={`${uid}-shelves`}
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-2 rounded-xl border border-line bg-sunken/40 px-3 py-2 text-left text-[14px] hover:border-muted"
+      >
+        <span aria-hidden className="text-muted">
+          ▸
+        </span>
+        <span className="font-semibold">Chart settings</span>
+        <span className="min-w-0 flex-1 truncate text-muted">{summary}</span>
+      </button>
+    );
+  }
   return (
-    <div className="space-y-3 rounded-xl border border-line bg-sunken/40 p-3 text-[14px]">
+    <div id={`${uid}-shelves`} className="space-y-3 rounded-xl border border-line bg-sunken/40 p-3 text-[14px]">
+      <button
+        type="button"
+        aria-expanded
+        aria-controls={`${uid}-shelves`}
+        onClick={() => setOpen(false)}
+        className="-mt-1 flex w-full items-center gap-2 text-left text-[14px]"
+      >
+        <span aria-hidden className="text-muted">
+          ▾
+        </span>
+        <span className="font-semibold">Chart settings</span>
+        <span className="ml-auto text-[13px] text-muted">Collapse</span>
+      </button>
       <div role="radiogroup" aria-label="Mark type" className="flex flex-wrap gap-1">
         {MARKS.map((m) => (
           <button

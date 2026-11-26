@@ -16,6 +16,9 @@ export const PALETTE = {
 };
 const MAX_SERIES = PALETTE.light.length; // past this, the smallest fold into "Other"
 const MAX_PANELS = 24;
+/** Thinnest bar drawn, in px: about the size of a mouse pointer. */
+const MIN_BAR_PX = 24;
+const BAR_GAP = 0.25;
 export const MAX_FILTER_VALUES = 500;
 
 export const AGG_LABEL: Record<ChartAgg, string> = {
@@ -234,6 +237,7 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
   const legendNames = new Set<string>();
   const aggName = (m: string) => (agg === "none" ? m : agg === "count" ? "Count of rows" : `${AGG_LABEL[agg]} of ${m}`);
   const catCounts: number[] = [];
+  const seriesCounts: number[] = [];
   // Side-by-side bars reserve a slot per colour at every X; when each X has a single colour
   // (a SKU belongs to one brand), draw them full width instead.
   let xSingleColor = true;
@@ -290,6 +294,7 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
     else if (spec.sort === "asc") xs = xs.sort((a, b) => a.total - b.total);
     else if (xType !== "category") xs = xs.sort((a, b) => (a.v! < b.v! ? -1 : a.v! > b.v! ? 1 : 0));
     catCounts.push(xs.length);
+    seriesCounts.push(series.length);
 
     const legendId = perPanel ? `legend${n}` : "legend";
     for (const s of series) {
@@ -323,7 +328,8 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
           orientation: horizontal ? "h" : "v",
           x: horizontal ? py : dims,
           y: horizontal ? dims : py,
-          hovertemplate: `<b>%{fullData.name}</b><br>${spec.x}: %{${horizontal ? "y" : "x"}}<br>${aggName(s.measure)}: ${valueFmt(horizontal ? "x" : "y")}<extra></extra>`,
+          // Unified hover: the tooltip's title is the category, each line one series.
+          hovertemplate: `%{fullData.name}: <b>${valueFmt(horizontal ? "x" : "y")}</b><extra></extra>`,
         });
       } else {
         Object.assign(t, {
@@ -331,7 +337,10 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
           mode: type === "scatter" ? "markers" : type === "area" ? "lines" : "lines+markers",
           x: dims,
           y: py,
-          hovertemplate: `<b>%{fullData.name}</b><br>${spec.x}: %{x}<br>${aggName(s.measure)}: ${valueFmt("y")}<extra></extra>`,
+          hovertemplate:
+            type === "scatter"
+              ? `<b>%{fullData.name}</b><br>${spec.x}: %{x}<br>${aggName(s.measure)}: ${valueFmt("y")}<extra></extra>`
+              : `%{fullData.name}: <b>${valueFmt("y")}</b><extra></extra>`,
         });
         if (type === "area") {
           t.stackgroup = `p${pi}`;
@@ -370,8 +379,14 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
   const TOP = sharedLegend ? 26 * Math.ceil(legendNames.size / 5) + 16 : 16;
   const BOTTOM = 56;
   const GAP = multi ? (perPanel ? 92 : 78) : 0; // room for tick labels, the panel title and its legend
+  // Every bar is at least MIN_BAR_PX thick (about a mouse pointer), so it can be seen and hovered:
+  // grouped bars share a category's band, so the band grows with the number of bars in it.
+  const isBar = type === "bar" || type === "hbar";
+  const barmode = spec.barmode === "stack" || spec.barmode === "percent" || (colorCol && xSingleColor) ? "relative" : "group";
+  const barsPerCat = (i: number) => (isBar && barmode === "group" ? Math.max(1, seriesCounts[i]) : 1);
+  const bandPx = (i: number) => (barsPerCat(i) * MIN_BAR_PX) / (1 - BAR_GAP);
   const panelPx = panels.map((_, i) =>
-    horizontal ? Math.max(120, Math.min(catCounts[i], 60) * 22 + 20) : multi ? 200 : 360,
+    horizontal ? Math.max(120, Math.min(catCounts[i], 60) * bandPx(i) + 20) : multi ? 200 : 360,
   );
   const plotPx = panelPx.reduce((a, b) => a + b, 0) + GAP * Math.max(0, panels.length - 1) + (multi ? 28 : 0);
   let cursor = multi ? 28 : 0; // px from the top of the plot area
@@ -393,16 +408,23 @@ export function buildChart(spec: ChartSpec, r: QueryResult): { figure: Figure; i
   });
 
   Object.assign(layout, {
-    barmode: spec.barmode === "stack" || spec.barmode === "percent" || (colorCol && xSingleColor) ? "relative" : "group",
+    barmode,
     barnorm: spec.barmode === "percent" && (type === "bar" || type === "hbar") ? "percent" : undefined,
-    bargap: 0.25,
+    bargap: BAR_GAP,
     bargroupgap: 0.08,
     showlegend: perPanel || legendNames.size > 1,
     ...(perPanel ? {} : { legend: sharedLegend ? { orientation: "h", x: 0, xanchor: "left", y: 1, yanchor: "bottom", yref: "paper" } : { visible: false } }),
-    hovermode: "closest",
+    // Hover anywhere in a category's column (row, for horizontal bars) lists every series there,
+    // so short or zero-height bars and thin lines can still be read. Scatter keeps nearest-point hover.
+    hovermode: type === "scatter" ? "closest" : horizontal ? "y unified" : "x unified",
     annotations,
     margin: { t: TOP, b: BOTTOM },
   });
   if (multi || horizontal) layout.height = Math.min(2400, plotPx + TOP + BOTTOM + 8);
+  // Vertical bars: the plot is never narrower than its bars need; PlotlyChart scrolls sideways instead.
+  if (isBar && !horizontal && categorical) {
+    const need = Math.max(...panels.map((_, i) => Math.min(catCounts[i], 200) * bandPx(i)));
+    if (Number.isFinite(need)) layout.meta = { minWidth: Math.ceil(need + 96) };
+  }
   return { figure: { data, layout }, info };
 }

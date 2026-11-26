@@ -22,6 +22,12 @@ function figureTitle(layout: Record<string, unknown>): string {
   return typeof text === "string" ? text.replace(/<br\s*\/?>/gi, " ").replace(/<[^>]+>/g, "").trim() : "";
 }
 
+/** Minimum plot width the figure asks for (lib/chart.ts sets it so every bar stays pointer-sized). */
+function figureMinWidth(layout: Record<string, unknown>): number | null {
+  const w = (layout.meta as { minWidth?: unknown } | undefined)?.minWidth;
+  return typeof w === "number" && Number.isFinite(w) && w > 0 ? Math.min(w, 20000) : null;
+}
+
 function themeMode(): "light" | "dark" {
   const set = document.documentElement.dataset.theme;
   if (set === "light" || set === "dark") return set;
@@ -62,6 +68,7 @@ function themed(layout: Record<string, unknown>) {
   const css = getComputedStyle(document.documentElement);
   const ink = css.getPropertyValue("--ink").trim();
   const line = css.getPropertyValue("--line").trim();
+  const surface = css.getPropertyValue("--surface").trim() || "#ffffff";
   const out: Record<string, unknown> = { ...layout };
   // Every axis, including subplot axes (xaxis2, yaxis5…): theme colours, and let Plotly grow
   // the margins so tick labels are never clipped.
@@ -80,7 +87,11 @@ function themed(layout: Record<string, unknown>) {
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     font: { family: "Be Vietnam Pro, system-ui, sans-serif", size: typeof font.size === "number" ? font.size : 12, color: ink },
-    hoverlabel: { ...(layout.hoverlabel as object), bgcolor: undefined },
+    // A unified tooltip (one box listing every series at the hovered X) would otherwise take the
+    // transparent paper colour; give it the card surface and text ink.
+    hoverlabel: String(layout.hovermode ?? "").includes("unified")
+      ? { ...(layout.hoverlabel as object), bgcolor: surface, bordercolor: line, font: { color: ink } }
+      : { ...(layout.hoverlabel as object), bgcolor: undefined },
     margin: { ...m, l: num(m.l, MIN_MARGIN.l), r: num(m.r, MIN_MARGIN.r), t: num(m.t, MIN_MARGIN.t), b: num(m.b, MIN_MARGIN.b) },
     colorway: PALETTE[themeMode()],
   };
@@ -109,8 +120,15 @@ export function PlotlyChart({ figure, title }: { figure: Figure; title: string }
       .catch(() => setFailed(true));
     window.addEventListener("themechange", draw);
     const node = ref.current;
+    // `responsive` only follows window resizes; also follow the card's own width (a scrollbar
+    // appearing, a sidebar opening) so the plot never overflows its box.
+    const observer = new ResizeObserver(() => {
+      if (Plotly && node && !cancelled && node.querySelector(".main-svg")) Plotly.Plots.resize(node);
+    });
+    if (node) observer.observe(node);
     return () => {
       cancelled = true;
+      observer.disconnect();
       window.removeEventListener("themechange", draw);
       if (Plotly && node) Plotly.purge(node);
     };
@@ -118,16 +136,19 @@ export function PlotlyChart({ figure, title }: { figure: Figure; title: string }
   if (failed) return <p className="text-muted">The chart library failed to load. Download the JSON instead.</p>;
   const height = figureHeight(figure.layout);
   const heading = figureTitle(figure.layout);
+  const minWidth = figureMinWidth(figure.layout);
   return (
     <div>
       {heading && <p className="mb-1 text-sm font-medium leading-snug">{heading}</p>}
-      <div
-        ref={ref}
-        className={`w-full overflow-hidden ${height ? "" : "h-[380px] md:h-[440px]"}`}
-        style={height ? { height } : undefined}
-        role="img"
-        aria-label={heading || title}
-      />
+      <div className={minWidth ? "overflow-x-auto" : undefined}>
+        <div
+          ref={ref}
+          className={`w-full overflow-hidden ${height ? "" : "h-[380px] md:h-[440px]"}`}
+          style={{ ...(height ? { height } : {}), ...(minWidth ? { minWidth } : {}) }}
+          role="img"
+          aria-label={heading || title}
+        />
+      </div>
     </div>
   );
 }

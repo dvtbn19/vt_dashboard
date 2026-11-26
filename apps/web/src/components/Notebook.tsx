@@ -5,6 +5,7 @@ import { AutoTextarea } from "./AutoTextarea";
 import { Markdown } from "./Markdown";
 import { QueryEditor, type QueryFields } from "./QueryEditor";
 import { removeQuery, saveNotebook } from "@/app/lab/workspace-actions";
+import { headingsOf, publishToc, scrollToHeading, type TocItem } from "@/lib/notebookToc";
 import type { Notebook as NotebookData, NotebookCell, QueryEngine, SavedQuery } from "@/lib/types";
 
 /** A cell on screen: a SQL cell (saved query, or new and not saved yet) or a Markdown cell. */
@@ -12,7 +13,7 @@ type Cell =
   | { kind: "sql"; key: string; queryId: string | null; draftId: string; initial?: QueryFields; autoFocus?: boolean }
   | { kind: "md"; key: string; text: string; editing: boolean };
 
-type Heading = { level: number; text: string; cellKey: string; nth: number };
+type Heading = TocItem;
 
 const DRAFT_PREFIX = "vtlab:query-draft:";
 
@@ -20,19 +21,6 @@ function newKey() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-/** `#`…`######` headings of a Markdown cell, skipping fenced code blocks. */
-function headingsOf(text: string): { level: number; text: string }[] {
-  const out: { level: number; text: string }[] = [];
-  let fence = false;
-  for (const line of text.split("\n")) {
-    if (/^\s*(```|~~~)/.test(line)) fence = !fence;
-    if (fence) continue;
-    const m = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
-    if (m) out.push({ level: m[1].length, text: m[2].replace(/[*_`]/g, "") });
-  }
-  return out;
 }
 
 /** What gets saved: unsaved SQL cells are left out until they are saved as queries. */
@@ -211,12 +199,16 @@ export function Notebook({ projectId, queries, engine, notebook, currentId, init
     return items;
   }, [cells, byId]);
   const headingCount = contents.filter((x) => !("sql" in x)).length;
+  // Share the headings with the lab sidebar's "Notebook contents".
+  const tocKey = JSON.stringify(contents.filter((x): x is Heading => !("sql" in x)));
+  useEffect(() => {
+    publishToc(JSON.parse(tocKey) as TocItem[]);
+  }, [tocKey]);
+  useEffect(() => () => publishToc([]), []);
   const tocRef = useRef<HTMLDetailsElement>(null);
   const goTo = (cellKey: string, nth?: number) => {
     tocRef.current?.removeAttribute("open");
-    const el = document.getElementById(`cell-${cellKey}`);
-    const target = nth !== undefined ? (el?.querySelectorAll(".prose-lab h1, .prose-lab h2, .prose-lab h3, .prose-lab h4, .prose-lab h5, .prose-lab h6")[nth] ?? el) : el;
-    target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollToHeading(cellKey, nth);
   };
   const minLevel = Math.min(6, ...contents.flatMap((x) => ("sql" in x ? [] : [x.level])));
 

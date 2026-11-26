@@ -21,10 +21,10 @@ function Icon({ d }: { d: string }) {
   );
 }
 
-export function SideNav() {
+export function SideNav({ compact = false }: { compact?: boolean }) {
   const path = usePathname();
   return (
-    <nav aria-label="Lab" className="flex flex-col gap-1">
+    <nav aria-label="Lab" className={`flex flex-col gap-1 ${compact ? "items-center" : ""}`}>
       {ITEMS.map((it) => {
         const on = active(path, it.href);
         return (
@@ -32,10 +32,12 @@ export function SideNav() {
             key={it.href}
             href={it.href}
             aria-current={on ? "page" : undefined}
-            className={`flex min-h-11 items-center gap-3 rounded-lg px-3 text-[15px] ${on ? "bg-sunken font-semibold text-ink" : "text-muted hover:bg-sunken hover:text-ink"}`}
+            aria-label={compact ? it.label : undefined}
+            title={compact ? it.label : undefined}
+            className={`flex min-h-11 items-center rounded-lg text-[15px] ${compact ? "w-11 justify-center" : "gap-3 px-3"} ${on ? "bg-sunken font-semibold text-ink" : "text-muted hover:bg-sunken hover:text-ink"}`}
           >
             <Icon d={it.icon} />
-            {it.label}
+            {!compact && it.label}
           </Link>
         );
       })}

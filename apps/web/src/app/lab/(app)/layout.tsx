@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { signOut } from "../actions";
-import { BottomNav, SideNav } from "@/components/LabNav";
+import { cookies } from "next/headers";
+import { BottomNav } from "@/components/LabNav";
+import { LabSidebar } from "@/components/LabSidebar";
 import { MainFrame } from "@/components/MainFrame";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/api";
 import { portfolioHref } from "@/lib/config";
+import { SIDEBAR_COOKIE } from "@/lib/sidebar";
 
 export const metadata: Metadata = { title: { default: "Lab", template: "%s · Lab" }, robots: { index: false } };
 
@@ -22,6 +25,7 @@ function SignOut() {
 }
 
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
+  const sidebarCollapsed = (await cookies()).get(SIDEBAR_COOKIE)?.value === "collapsed";
   let me: Me = { email: null };
   try {
     me = await api<Me>("/v1/me");
@@ -30,26 +34,8 @@ export default async function LabLayout({ children }: { children: React.ReactNod
     if ((err as { digest?: string })?.digest?.startsWith("NEXT_REDIRECT")) throw err;
   }
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[240px_1fr]">
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface px-3 py-5 lg:flex">
-        <Link href="/lab" className="px-3 text-[17px] font-bold tracking-tight">
-          Project Lab
-        </Link>
-        <p className="px-3 text-[13px] text-muted">VTCONS</p>
-        <div className="mt-8 flex-1">
-          <SideNav />
-        </div>
-        <div className="space-y-1 border-t border-line pt-3">
-          {me.email && <p className="truncate px-3 text-[13px] text-muted" title={me.email}>{me.email}</p>}
-          <div className="flex items-center justify-between">
-            <SignOut />
-            <ThemeToggle />
-          </div>
-          <Link href={portfolioHref()} className="block px-3 py-2 text-[14px] text-muted hover:text-ink">
-            Public portfolio
-          </Link>
-        </div>
-      </aside>
+    <div className="min-h-dvh lg:grid lg:grid-cols-[auto_1fr]">
+      <LabSidebar email={me.email} portfolioHref={portfolioHref()} initialCollapsed={sidebarCollapsed} />
 
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-line bg-surface/95 px-4 backdrop-blur lg:hidden">
         <Link href="/lab" className="font-bold tracking-tight">

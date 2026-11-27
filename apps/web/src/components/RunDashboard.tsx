@@ -5,7 +5,7 @@ import { PlotlyChart } from "./PlotlyChart";
 import { Chip } from "./Status";
 import { fmtDate, num } from "@/lib/format";
 import type { RunDashboardData } from "@/lib/runDashboard";
-import { chartCaption, chartNumber, humanize, metricGrid, parseStory, pickStory } from "@/lib/runStory";
+import { chartCaption, chartLabel, chartNumber, humanize, isCompact, metricGrid, parseStory, pickStory, splitLead } from "@/lib/runStory";
 import type { Artifact, ArtifactPreview, Metric } from "@/lib/types";
 
 type Figure = { data: unknown[]; layout: Record<string, unknown> };
@@ -80,7 +80,9 @@ function ChartFigure({ c }: { c: Chart }) {
       <figcaption className="mb-2 flex items-start justify-between gap-3">
         <span className="flex min-w-0 items-baseline gap-2">
           {c.n !== null && (
-            <span className="tnum inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-sunken px-1.5 text-[12.5px] font-bold">{c.n}</span>
+            <span className="tnum inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-sunken px-1.5 text-[12.5px] font-bold">
+              {chartLabel(c.artifact) ?? c.n}
+            </span>
           )}
           <span className="text-[14px] font-semibold leading-snug">{chartCaption(c.artifact)}</span>
         </span>
@@ -113,6 +115,31 @@ function FileDetails({ a, p }: { a: Artifact; p: { ok: true; preview: ArtifactPr
   );
 }
 
+/** A long section: its opening text, then its charts (two per row on wide screens), then the detail. */
+function SplitSection({ body, items }: { body: string; items: Chart[] }) {
+  const { lead, tail } = splitLead(body);
+  const pair = items.length > 1;
+  return (
+    <div className="space-y-6">
+      {lead && (
+        <div className="min-w-0 max-w-[90ch] text-[15px]">
+          <Markdown text={lead} />
+        </div>
+      )}
+      <div className={`grid min-w-0 gap-5 ${pair ? "2xl:grid-cols-2" : ""}`}>
+        {items.map((c) => (
+          <ChartFigure key={c.artifact.id} c={c} />
+        ))}
+      </div>
+      {tail && (
+        <div className="min-w-0 text-[15px]">
+          <Markdown text={tail} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** A run shown as a dashboard: its story section by section, each with the charts it refers to. */
 export function RunDashboard({ data }: { data: RunDashboardData }) {
   const run = data.run!;
@@ -124,8 +151,10 @@ export function RunDashboard({ data }: { data: RunDashboardData }) {
     const p = pv(a);
     if (a.kind === "plotly" && p?.ok && p.preview.figure) charts.push({ artifact: a, figure: p.preview.figure as Figure, n: chartNumber(a) });
   }
-  charts.sort((x, y) => (x.n ?? 1e9) - (y.n ?? 1e9));
-  const byNumber = new Map(charts.filter((c) => c.n !== null).map((c) => [c.n as number, c]));
+  charts.sort((x, y) => (x.n ?? 1e9) - (y.n ?? 1e9) || x.artifact.name.localeCompare(y.artifact.name));
+  // Several files can share a number ("3a", "3b" are both chart 3).
+  const byNumber = new Map<number, Chart[]>();
+  for (const c of charts) if (c.n !== null) byNumber.set(c.n, [...(byNumber.get(c.n) ?? []), c]);
 
   const docs = ready
     .filter((a) => a.kind === "markdown")
@@ -139,11 +168,29 @@ export function RunDashboard({ data }: { data: RunDashboardData }) {
 
   const shown = new Set<Chart>();
   const sections = (story?.sections ?? []).map((s) => {
-    const cs = s.charts.map((n) => byNumber.get(n)).filter((c): c is Chart => !!c && !shown.has(c));
+    const cs = s.charts.flatMap((n) => byNumber.get(n) ?? []).filter((c): c is Chart => !!c && !shown.has(c));
     cs.forEach((c) => shown.add(c));
     return { ...s, items: cs };
   });
   const rest = charts.filter((c) => !shown.has(c));
+  // A report that never names its charts: show them first, it is a dashboard.
+  const chartsFirst = shown.size === 0;
+  const chartsBlock = (
+    <>
+      {rest.length > 0 && (
+        <section className="mt-12" aria-labelledby="rd-charts">
+          <h2 id="rd-charts" className="mb-5 border-b border-line pb-2 text-[21px] font-bold tracking-tight">
+            {chartsFirst ? "Charts" : "More charts"}
+          </h2>
+          <div className={`grid min-w-0 gap-5 ${rest.length > 1 ? "2xl:grid-cols-2" : ""}`}>
+            {rest.map((c) => (
+              <ChartFigure key={c.artifact.id} c={c} />
+            ))}
+          </div>
+        </section>
+      )}
+    </>
+  );
   const files = ready.filter((a) => a !== storyDoc?.artifact && !charts.some((c) => c.artifact === a));
   const params = Object.entries(run.params);
   const synthetic = run.tags.includes("synthetic") || /synthetic|tổng hợp|demo/i.test(story?.intro ?? "");
@@ -193,13 +240,15 @@ export function RunDashboard({ data }: { data: RunDashboardData }) {
         </section>
       )}
 
+      {chartsFirst && chartsBlock}
+
       {sections.map((s, i) => (
         <section key={i} className="mt-12" aria-labelledby={`rd-s${i}`}>
           <h2 id={`rd-s${i}`} className="mb-5 border-b border-line pb-2 text-[21px] font-bold tracking-tight md:text-[23px]">
             {s.heading}
           </h2>
-          {s.items.length ? (
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+          {s.items.length && isCompact(s.body) ? (
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
               {s.body && (
                 <div className="min-w-0 text-[15px] xl:sticky xl:top-6 xl:self-start">
                   <Markdown text={s.body} />
@@ -211,9 +260,11 @@ export function RunDashboard({ data }: { data: RunDashboardData }) {
                 ))}
               </div>
             </div>
+          ) : s.items.length ? (
+            <SplitSection body={s.body} items={s.items} />
           ) : (
             s.body && (
-              <div className="max-w-[80ch] text-[15px]">
+              <div className="min-w-0 text-[15px]">
                 <Markdown text={s.body} />
               </div>
             )
@@ -221,18 +272,8 @@ export function RunDashboard({ data }: { data: RunDashboardData }) {
         </section>
       ))}
 
-      {rest.length > 0 && (
-        <section className="mt-12" aria-labelledby="rd-charts">
-          <h2 id="rd-charts" className="mb-5 border-b border-line pb-2 text-[21px] font-bold tracking-tight">
-            {sections.length ? "More charts" : "Charts"}
-          </h2>
-          <div className="space-y-5">
-            {rest.map((c) => (
-              <ChartFigure key={c.artifact.id} c={c} />
-            ))}
-          </div>
-        </section>
-      )}
+
+      {!chartsFirst && chartsBlock}
 
       {(files.length > 0 || params.length > 0) && (
         <section className="mt-12" aria-labelledby="rd-files">

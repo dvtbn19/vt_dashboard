@@ -79,11 +79,24 @@ function themed(layout: Record<string, unknown>) {
   const m = (layout.margin ?? {}) as Record<string, unknown>;
   const num = (v: unknown, min: number) => (typeof v === "number" ? Math.max(v, min) : min);
   const font = (layout.font ?? {}) as Record<string, unknown>;
+  // The title is drawn as HTML above the plot, so the top margin the figure kept for it is empty
+  // space: keep only room for a legend placed on top, and shrink the height by what was removed.
+  const legend = (layout.legend ?? {}) as Record<string, unknown>;
+  const topLegend = layout.showlegend !== false && typeof legend.y === "number" && legend.y >= 1 && legend.orientation === "h";
+  let top = num(m.t, MIN_MARGIN.t);
+  let height = figureHeight(layout);
+  if (figureTitle(layout) && typeof m.t === "number") {
+    const wanted = topLegend ? 44 : 20;
+    if (m.t > wanted) {
+      top = wanted;
+      if (height !== null) height = Math.max(240, height - (m.t - wanted));
+    }
+  }
   return {
     ...out,
     title: { text: "" },
     autosize: true,
-    height: figureHeight(layout) ?? undefined,
+    height: height ?? undefined,
     paper_bgcolor: "rgba(0,0,0,0)",
     plot_bgcolor: "rgba(0,0,0,0)",
     font: { family: "Be Vietnam Pro, system-ui, sans-serif", size: typeof font.size === "number" ? font.size : 12, color: ink },
@@ -92,7 +105,7 @@ function themed(layout: Record<string, unknown>) {
     hoverlabel: String(layout.hovermode ?? "").includes("unified")
       ? { ...(layout.hoverlabel as object), bgcolor: surface, bordercolor: line, font: { color: ink } }
       : { ...(layout.hoverlabel as object), bgcolor: undefined },
-    margin: { ...m, l: num(m.l, MIN_MARGIN.l), r: num(m.r, MIN_MARGIN.r), t: num(m.t, MIN_MARGIN.t), b: num(m.b, MIN_MARGIN.b) },
+    margin: { ...m, l: num(m.l, MIN_MARGIN.l), r: num(m.r, MIN_MARGIN.r), t: top, b: num(m.b, MIN_MARGIN.b) },
     colorway: PALETTE[themeMode()],
   };
 }

@@ -259,9 +259,17 @@ body {
   .prose-lab th,
   .prose-lab td {
     border-bottom: 1px solid var(--line);
-    padding: 6px 12px 6px 0;
+    padding: 6px 14px 6px 0;
     text-align: left;
-    white-space: nowrap;
+    vertical-align: top;
+    /* Wrap long cells instead of making the table pages wide; keep short values on one line. */
+    min-width: 6.5em;
+    max-width: 30em;
+  }
+  .prose-lab th {
+    vertical-align: bottom;
+    font-size: 13px;
+    color: var(--muted);
   }
   .prose-lab th {
     font-weight: 600;

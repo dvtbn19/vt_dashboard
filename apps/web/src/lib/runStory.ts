@@ -30,15 +30,49 @@ function numbersOf(list: string): number[] {
 }
 
 export function chartNumber(a: Artifact): number | null {
-  const d = a.description ? /^\s*(\d{1,3})\s*[·.:)–—-]/.exec(a.description) : null;
+  const d = a.description ? /^\s*(\d{1,3})[a-z]?\s*[·.:)–—-]/i.exec(a.description) : null;
   if (d) return Number(d[1]);
-  const n = /(?:^|[_\-\s])(\d{1,3})(?=[_\-\s.])/.exec(a.name);
+  // "story_3_x.json", and "store_3a_x.json" / "store_3b_x.json" both count as chart 3.
+  const n = /(?:^|[_\-\s])(\d{1,3})[a-z]?(?=[_\-\s.])/i.exec(a.name);
   return n ? Number(n[1]) : null;
+}
+
+/** The chart's number as written ("3", or "3a" for a file named store_3a_x.json). */
+export function chartLabel(a: Artifact): string | null {
+  const d = a.description ? /^\s*(\d{1,3}[a-z]?)\s*[·.:)–—-]/i.exec(a.description) : null;
+  if (d) return d[1];
+  const n = /(?:^|[_\-\s])(\d{1,3}[a-z]?)(?=[_\-\s.])/i.exec(a.name);
+  return n ? n[1] : null;
 }
 
 /** The chart's caption without its leading number. */
 export function chartCaption(a: Artifact): string {
-  return (a.description || a.name).replace(/^\s*\d{1,3}\s*[·.:)–—-]\s*/, "");
+  return (a.description || a.name).replace(/^\s*\d{1,3}[a-z]?\s*[·.:)–—-]\s*/i, "");
+}
+
+/**
+ * Where a long section's charts go: after its opening text, before the first table or `###`
+ * sub-heading, so the charts are seen next to the summary rather than after pages of detail.
+ */
+export function splitLead(body: string): { lead: string; tail: string } {
+  const lines = body.split("\n");
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) fence = !fence;
+    if (!fence && i > 0 && (/^\s*\|/.test(lines[i]) || /^###\s/.test(lines[i]))) {
+      // Keep a heading/label line that introduces the table with the table.
+      let at = i;
+      while (at > 0 && lines[at - 1].trim() === "") at--;
+      if (at > 0 && /^\s*(\*\*[^*]+\*\*:?|#{3,6}\s.*)\s*$/.test(lines[at - 1])) at--;
+      return { lead: lines.slice(0, at).join("\n").trim(), tail: lines.slice(at).join("\n").trim() };
+    }
+  }
+  return { lead: body.trim(), tail: "" };
+}
+
+/** Short text without tables sits beside its charts; anything longer gets the full width. */
+export function isCompact(body: string): boolean {
+  return body.length < 1400 && !/^\s*\|/m.test(body) && !/^###\s/m.test(body);
 }
 
 export function parseStory(text: string): Story {

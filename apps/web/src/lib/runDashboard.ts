@@ -10,6 +10,8 @@ export type RunDashboardData = {
   /** The pinned run, or null; `pinSupported` is false until migration 0006 is applied. */
   pinned: string | null;
   pinSupported: boolean;
+  /** The pinned run is published at /dashboards/<project slug>. */
+  isPublic: boolean;
   run: RunDetail | null;
   previews: Record<string, LoadedPreview>;
 };
@@ -38,10 +40,10 @@ export async function loadRunDashboard(projectId: string, wanted?: string): Prom
   const [list, pin] = await Promise.all([
     api<RunListItem[]>(`/v1/projects/${projectId}/runs?limit=50`),
     api<DashboardPin>(`/v1/projects/${projectId}/dashboard`).then(
-      (p) => ({ ok: true as const, run_id: p.run_id }),
+      (p) => ({ ok: true as const, run_id: p.run_id, is_public: p.is_public }),
       (err: unknown) => {
         if (isNextControl(err)) throw err;
-        return { ok: false as const, run_id: null };
+        return { ok: false as const, run_id: null, is_public: false };
       },
     ),
   ]);
@@ -66,5 +68,5 @@ export async function loadRunDashboard(projectId: string, wanted?: string): Prom
     const loaded = await Promise.all(ready.map(preview));
     ready.forEach((a, i) => (previews[a.id] = loaded[i]));
   }
-  return { runs, pinned: pin.run_id, pinSupported: pin.ok, run, previews };
+  return { runs, pinned: pin.run_id, pinSupported: pin.ok, isPublic: pin.is_public, run, previews };
 }

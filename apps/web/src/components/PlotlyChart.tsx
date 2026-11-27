@@ -64,6 +64,29 @@ function themedData(data: unknown[], layout: Record<string, unknown>): unknown[]
   });
 }
 
+/**
+ * Top margin and height to draw with. The title is drawn as HTML above the plot, so the top margin
+ * the figure kept for it is empty space: keep only room for a legend placed on top, and shrink the
+ * height by what was removed so the plot area stays the same.
+ */
+function plotBox(layout: Record<string, unknown>): { top: number; height: number | null } {
+  const m = (layout.margin ?? {}) as Record<string, unknown>;
+  const legend = (layout.legend ?? {}) as Record<string, unknown>;
+  const topLegend = layout.showlegend !== false && typeof legend.y === "number" && legend.y >= 1 && legend.orientation === "h";
+  let top = typeof m.t === "number" ? Math.max(m.t, MIN_MARGIN.t) : MIN_MARGIN.t;
+  let height = figureHeight(layout);
+  if (figureTitle(layout) && typeof m.t === "number") {
+    const wanted = topLegend ? 44 : 20;
+    if (m.t > wanted) {
+      top = wanted;
+      if (height !== null) height = Math.max(240, height - (m.t - wanted));
+    }
+  }
+  return { top, height };
+}
+
+const isTableOnly = (data: unknown[]) => data.length > 0 && data.every((t) => (t as { type?: unknown }).type === "table");
+
 function themed(layout: Record<string, unknown>) {
   const css = getComputedStyle(document.documentElement);
   const ink = css.getPropertyValue("--ink").trim();
@@ -79,19 +102,7 @@ function themed(layout: Record<string, unknown>) {
   const m = (layout.margin ?? {}) as Record<string, unknown>;
   const num = (v: unknown, min: number) => (typeof v === "number" ? Math.max(v, min) : min);
   const font = (layout.font ?? {}) as Record<string, unknown>;
-  // The title is drawn as HTML above the plot, so the top margin the figure kept for it is empty
-  // space: keep only room for a legend placed on top, and shrink the height by what was removed.
-  const legend = (layout.legend ?? {}) as Record<string, unknown>;
-  const topLegend = layout.showlegend !== false && typeof legend.y === "number" && legend.y >= 1 && legend.orientation === "h";
-  let top = num(m.t, MIN_MARGIN.t);
-  let height = figureHeight(layout);
-  if (figureTitle(layout) && typeof m.t === "number") {
-    const wanted = topLegend ? 44 : 20;
-    if (m.t > wanted) {
-      top = wanted;
-      if (height !== null) height = Math.max(240, height - (m.t - wanted));
-    }
-  }
+  const { top, height } = plotBox(layout);
   return {
     ...out,
     title: { text: "" },
@@ -119,10 +130,26 @@ export function PlotlyChart({ figure, title }: { figure: Figure; title: string }
     let Plotly: typeof import("plotly.js-dist-min") | null = null;
     const draw = () => {
       if (!Plotly || !ref.current || cancelled) return;
-      Plotly.react(ref.current, themedData(figure.data, figure.layout) as Data[], themed(figure.layout) as Partial<Layout>, {
+      const node = ref.current;
+      const layout = themed(figure.layout);
+      node.style.height = layout.height ? `${layout.height}px` : "";
+      void Plotly.react(node, themedData(figure.data, figure.layout) as Data[], layout as Partial<Layout>, {
         responsive: true,
         displaylogo: false,
         modeBarButtonsToRemove: ["lasso2d", "select2d"],
+      }).then(() => {
+        // A table figure keeps the height its author guessed; Plotly leaves the rest blank. Shrink
+        // the box to the rows actually drawn (a table taller than its box scrolls and is left alone).
+        if (!Plotly || cancelled || !isTableOnly(figure.data)) return;
+        const top = node.getBoundingClientRect().top;
+        const bottoms = [...node.querySelectorAll(".cell-rect")].map((r) => r.getBoundingClientRect()).filter((r) => r.height > 0).map((r) => r.bottom - top);
+        if (!bottoms.length) return;
+        const fit = Math.ceil(Math.max(...bottoms) + 16);
+        const current = node.getBoundingClientRect().height;
+        if (fit < current - 24) {
+          node.style.height = `${fit}px`;
+          void Plotly.relayout(node, { height: fit });
+        }
       });
     };
     import("plotly.js-dist-min")
@@ -147,7 +174,7 @@ export function PlotlyChart({ figure, title }: { figure: Figure; title: string }
     };
   }, [figure]);
   if (failed) return <p className="text-muted">The chart library failed to load. Download the JSON instead.</p>;
-  const height = figureHeight(figure.layout);
+  const height = plotBox(figure.layout).height;
   const heading = figureTitle(figure.layout);
   const minWidth = figureMinWidth(figure.layout);
   return (

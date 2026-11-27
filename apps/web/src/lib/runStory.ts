@@ -10,7 +10,7 @@ export type StorySection = { heading: string; body: string; charts: number[] };
 export type Story = { title: string; intro: string; sections: StorySection[] };
 
 const REF_WORDS = "biểu đồ|bieu do|charts?|figures?|figs?\\.?|exhibits?|hình";
-const REF_RE = new RegExp(`\\(\\s*(?:${REF_WORDS})\\s*([0-9][0-9\\s,;&–—-]*(?:(?:và|and)\\s*[0-9]+)?)\\s*\\)`, "i");
+const REF_RE = new RegExp(`\\(\\s*(?:${REF_WORDS})\\s*([0-9][0-9\\s,;&–—-]*(?:(?:và|and)\\s*[0-9]+)?)[^)]*\\)`, "i");
 const ANY_REF_RE = new RegExp(`(?:${REF_WORDS})\\s*[0-9]`, "gi");
 
 /** "0, 1" / "2–4" / "5 và 6" → [0, 1] / [2, 3, 4] / [5, 6]. */
@@ -29,9 +29,12 @@ function numbersOf(list: string): number[] {
   return [...new Set(out)];
 }
 
+/** A description that starts with the chart's number: "3 · Title", "3a: Title", "03 Title". */
+const NUMBERED = /^\s*(\d{1,3}[a-z]?)(?:\s*[·.:)–—-]\s*|\s+(?=\S))/i;
+
 export function chartNumber(a: Artifact): number | null {
-  const d = a.description ? /^\s*(\d{1,3})[a-z]?\s*[·.:)–—-]/i.exec(a.description) : null;
-  if (d) return Number(d[1]);
+  const d = a.description ? NUMBERED.exec(a.description) : null;
+  if (d) return parseInt(d[1], 10);
   // "story_3_x.json", and "store_3a_x.json" / "store_3b_x.json" both count as chart 3.
   const n = /(?:^|[_\-\s])(\d{1,3})[a-z]?(?=[_\-\s.])/i.exec(a.name);
   return n ? Number(n[1]) : null;
@@ -39,7 +42,7 @@ export function chartNumber(a: Artifact): number | null {
 
 /** The chart's number as written ("3", or "3a" for a file named store_3a_x.json). */
 export function chartLabel(a: Artifact): string | null {
-  const d = a.description ? /^\s*(\d{1,3}[a-z]?)\s*[·.:)–—-]/i.exec(a.description) : null;
+  const d = a.description ? NUMBERED.exec(a.description) : null;
   if (d) return d[1];
   const n = /(?:^|[_\-\s])(\d{1,3}[a-z]?)(?=[_\-\s.])/i.exec(a.name);
   return n ? n[1] : null;
@@ -47,7 +50,7 @@ export function chartLabel(a: Artifact): string | null {
 
 /** The chart's caption without its leading number. */
 export function chartCaption(a: Artifact): string {
-  return (a.description || a.name).replace(/^\s*\d{1,3}[a-z]?\s*[·.:)–—-]\s*/i, "");
+  return (a.description || a.name).replace(NUMBERED, "");
 }
 
 /**
@@ -56,10 +59,15 @@ export function chartCaption(a: Artifact): string {
  */
 export function splitLead(body: string): { lead: string; tail: string } {
   const lines = body.split("\n");
+  const isRow = (l: string | undefined) => l !== undefined && /^\s*\|/.test(l);
+  // A section that opens with a table: that table is its summary and stays in the lead.
+  let start = 0;
+  if (isRow(lines[0])) while (start < lines.length && (isRow(lines[start]) || !lines[start].trim())) start++;
   let fence = false;
-  for (let i = 0; i < lines.length; i++) {
+  for (let i = start; i < lines.length; i++) {
     if (/^\s*(```|~~~)/.test(lines[i])) fence = !fence;
-    if (!fence && i > 0 && (/^\s*\|/.test(lines[i]) || /^###\s/.test(lines[i]))) {
+    // Only the first row of a table can start the detail: never split between its rows.
+    if (!fence && ((isRow(lines[i]) && !isRow(lines[i - 1])) || /^###\s/.test(lines[i]))) {
       // Keep a heading/label line that introduces the table with the table.
       let at = i;
       while (at > 0 && lines[at - 1].trim() === "") at--;
@@ -112,7 +120,13 @@ export function pickStory<T extends { artifact: Artifact; text: string }>(docs: 
 
 // ------------------------------------------------------------------ metrics
 
-export type MetricGrid = { rows: string[]; columns: string[]; value: (row: string, col: string) => Metric | undefined };
+export type MetricGrid = {
+  rows: string[];
+  columns: string[];
+  value: (row: string, col: string) => Metric | undefined;
+  /** Metrics that do not fit the grid, shown on their own. */
+  rest: Metric[];
+};
 
 function split(key: string, at: number): [string, string] {
   const parts = key.split("_");
@@ -122,7 +136,7 @@ function split(key: string, at: number): [string, string] {
 /**
  * Metrics named `<thing>_<measure>` for several things and the same measures (cat_food_real_growth_pct,
  * coffee_real_growth_pct, …) read better as a table: one row per thing, one column per measure.
- * Returns null when the keys do not form such a grid.
+ * Keys that do not fit (store_abnormal_cells) are returned in `rest`. Null when there is no grid.
  */
 export function metricGrid(metrics: Metric[]): MetricGrid | null {
   const latest = new Map<string, Metric>();
@@ -143,14 +157,25 @@ export function metricGrid(metrics: Metric[]): MetricGrid | null {
         break;
       }
     }
-    if (!cell.has(k)) return null;
   }
-  const rows = [...new Set([...cell.values()].map(([r]) => r))];
-  const columns = [...new Set([...cell.values()].map(([, c]) => c))];
-  if (rows.length < 2 || columns.length < 2 || columns.length > 6 || rows.length * columns.length !== keys.length) return null;
-  const byCell = new Map([...cell.entries()].map(([k, [r, c]]) => [`${r}\u0000${c}`, latest.get(k)!]));
-  if (byCell.size !== keys.length) return null;
-  return { rows, columns, value: (r, c) => byCell.get(`${r}\u0000${c}`) };
+  // Columns are measures shared by at least two rows; rows need at least two of those columns.
+  const rowsOf = new Map<string, Set<string>>();
+  for (const [r, c] of cell.values()) rowsOf.set(c, (rowsOf.get(c) ?? new Set()).add(r));
+  const columns = [...rowsOf.entries()].filter(([, rs]) => rs.size >= 2).map(([c]) => c);
+  const colsOf = new Map<string, number>();
+  for (const [r, c] of cell.values()) if (columns.includes(c)) colsOf.set(r, (colsOf.get(r) ?? 0) + 1);
+  const rows = [...colsOf.entries()].filter(([, n]) => n >= 2).map(([r]) => r);
+  if (rows.length < 2 || columns.length < 2 || columns.length > 6) return null;
+  const byCell = new Map<string, Metric>();
+  for (const [k, [r, c]] of cell.entries()) if (rows.includes(r) && columns.includes(c)) byCell.set(`${r}\u0000${c}`, latest.get(k)!);
+  if (byCell.size < 0.75 * rows.length * columns.length) return null;
+  const inGrid = new Set(byCell.values());
+  return {
+    rows,
+    columns,
+    value: (r, c) => byCell.get(`${r}\u0000${c}`),
+    rest: [...latest.values()].filter((m) => !inGrid.has(m)),
+  };
 }
 
 export function humanize(key: string): string {

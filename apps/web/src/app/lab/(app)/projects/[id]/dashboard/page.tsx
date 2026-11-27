@@ -4,6 +4,7 @@ import { Presentation } from "@/components/Presentation";
 import { ProblemState } from "@/components/ProblemState";
 import { RunDashboard } from "@/components/RunDashboard";
 import { attempt } from "@/lib/attempt";
+import { portfolioHref } from "@/lib/config";
 import { loadPresentation } from "@/lib/presentation";
 import { loadRunDashboard } from "@/lib/runDashboard";
 
@@ -55,7 +56,15 @@ export default async function DashboardPage({
               <ViewTabs base={base} view="run" />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <DashboardSource projectId={id} runs={options} current={data.run.id} pinned={data.pinned} pinSupported={data.pinSupported} />
+              <DashboardSource
+                projectId={id}
+                runs={options}
+                current={data.run.id}
+                pinned={data.pinned}
+                pinSupported={data.pinSupported}
+                isPublic={data.isPublic}
+                publicUrl={portfolioHref(`/dashboards/${data.run.project.slug}`)}
+              />
               <Link href={`/lab/projects/${id}/workspace`} className="btn btn-quiet !min-h-10 !px-3 text-[14px]">
                 Workspace
               </Link>

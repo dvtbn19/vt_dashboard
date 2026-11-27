@@ -52,7 +52,8 @@ A query's `chart`: `{type: bar|hbar|line|area|scatter, x, y: [measures]}` plus o
 | GET | `/v1/projects/{id}/notebook` | user, agent `read` | the workspace notebook: `{cells, version, last_edited_by, updated_at}`; `version: 0` and `cells: []` when none saved yet |
 | PUT | `/v1/projects/{id}/notebook` | user, agent `queries:write` | `{base_version, cells}` replaces the cell order (`base_version: 0` creates it); **409** `{message, current_version}` if it changed |
 | GET | `/v1/projects/{id}/dashboard` | user, agent `read` | `{run_id, updated_by, updated_at}`: the run the project dashboard shows; `run_id: null` = latest completed run with a chart |
-| PUT | `/v1/projects/{id}/dashboard` | user, agent `runs:write` | `{run_id}` pins a run of this project (422 for another project's run); `null` clears it |
+| PUT | `/v1/projects/{id}/dashboard` | user, agent `runs:write` | `{run_id, is_public?}` pins a run of this project (422 for another project's run); `null` clears it and unpublishes. `is_public` is **user only** and needs a pinned run; agents get 403 for it, and 403 when changing a published dashboard |
+| GET | `/v1/public/dashboards/{slug}` | anyone | a published dashboard: `{project{slug,name,category}, run{name,status,params,tags,started_at,finished_at}, metrics, artifacts[{id,name,kind,description,preview,error}], published_at}`; no downloads, no owner details; 404 unless published |
 | GET | `/v1/public/projects`, `/v1/public/projects/{slug}` | anyone | only `visibility=public`; no ids, runs or files |
 
 Notebook `cells` (max 500): `{type: "sql", query_id}` (a saved query of the project, which holds the

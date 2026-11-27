@@ -181,3 +181,19 @@ export async function pinDashboardRun(projectId: string, runId: string | null): 
     return { ok: false, error: errorText(err) };
   }
 }
+
+/** Publish the pinned run's dashboard for anyone with the link, or take it down. */
+export async function publishDashboard(
+  projectId: string,
+  runId: string,
+  isPublic: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await api(`/v1/projects/${projectId}/dashboard`, { method: "PUT", body: JSON.stringify({ run_id: runId, is_public: isPublic }) });
+    revalidatePath(`/lab/projects/${projectId}/dashboard`);
+    return { ok: true };
+  } catch (err) {
+    if (isRedirect(err)) throw err;
+    return { ok: false, error: errorText(err) };
+  }
+}

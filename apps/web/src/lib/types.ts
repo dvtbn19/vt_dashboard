@@ -171,4 +171,20 @@ export type NotebookCell = { type: "sql"; query_id: string } | { type: "markdown
 export type Notebook = { project_id: string; cells: NotebookCell[]; version: number; last_edited_by: string; updated_at: string | null };
 
 /** Which run a project's dashboard shows; null means the latest completed run with a chart. */
-export type DashboardPin = { project_id: string; run_id: string | null; updated_by: string; updated_at: string | null };
+export type DashboardPin = {
+  project_id: string;
+  run_id: string | null;
+  is_public: boolean;
+  published_at: string | null;
+  updated_by: string;
+  updated_at: string | null;
+};
+
+/** A dashboard its owner published: what anyone can read at /dashboards/<slug>. */
+export type PublicDashboard = {
+  project: { slug: string; name: string; category: string };
+  run: { name: string; status: RunStatus; params: Record<string, unknown>; tags: string[]; started_at: string; finished_at: string | null };
+  metrics: Metric[];
+  artifacts: { id: string; name: string; kind: Artifact["kind"]; description: string | null; preview: ArtifactPreview | null; error: string | null }[];
+  published_at: string | null;
+};

@@ -435,3 +435,58 @@ def test_dashboard_pin_run(client: TestClient, owner, other, project):
     rw = bearer(make_token(client, owner, [pid], scopes=["read", "runs:write"]))
     r = client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=rw)
     assert r.status_code == 200 and r.json()["run_id"] is None
+
+
+def test_dashboard_publish(client: TestClient, owner, other, project):
+    from tests.test_api import upload
+
+    pid, slug = project["id"], project["slug"]
+    run = client.post(f"/v1/projects/{pid}/runs", json={"name": "story"}, headers=owner).json()
+    _, done = upload(
+        client,
+        owner,
+        run["id"],
+        "story.md",
+        b"# Story\n\n## 1. Did it work? (chart 0)\nYes.",
+        "text/markdown",
+    )
+    assert done.status_code == 200, done.text
+    client.post(
+        f"/v1/runs/{run['id']}/metrics", json={"metrics": [{"key": "lift_pct", "value": 3.5}]}, headers=owner
+    )
+
+    # Nothing is public until the owner publishes a pinned run.
+    assert client.get(f"/v1/public/dashboards/{slug}").status_code == 404
+    bad = client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None, "is_public": True}, headers=owner)
+    assert bad.status_code == 422
+    r = client.put(
+        f"/v1/projects/{pid}/dashboard", json={"run_id": run["id"], "is_public": True}, headers=owner
+    )
+    assert r.status_code == 200 and r.json()["is_public"] and r.json()["published_at"]
+
+    pub = client.get(f"/v1/public/dashboards/{slug}")
+    assert pub.status_code == 200, pub.text
+    body = pub.json()
+    assert body["run"]["name"] == "story" and body["metrics"][0]["key"] == "lift_pct"
+    assert body["artifacts"][0]["preview"]["text"].startswith("# Story")
+    assert "owner" not in pub.text and "@" not in pub.text  # no owner details
+
+    # Agents can neither publish nor change a published dashboard; strangers cannot either.
+    rw = bearer(make_token(client, owner, [pid], scopes=["read", "runs:write"]))
+    assert (
+        client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": run["id"]}, headers=rw).status_code == 403
+    )
+    assert (
+        client.put(
+            f"/v1/projects/{pid}/dashboard", json={"run_id": None, "is_public": True}, headers=rw
+        ).status_code
+        == 403
+    )
+    assert (
+        client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=other).status_code == 404
+    )
+
+    # Unpinning unpublishes.
+    r = client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=owner)
+    assert r.status_code == 200 and not r.json()["is_public"]
+    assert client.get(f"/v1/public/dashboards/{slug}").status_code == 404

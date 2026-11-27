@@ -7,6 +7,22 @@ import remarkGfm from "remark-gfm";
  * viewer's browser fetch arbitrary remote URLs.
  */
 const components: Components = {
+  // Tables scroll sideways on their own instead of widening the page; see .prose-lab in globals.css.
+  table: ({ children }) => (
+    <div className="table-scroll" tabIndex={0} role="region" aria-label="Table">
+      <table>{children}</table>
+    </div>
+  ),
+  th: ({ children, style }) => (
+    <th style={style}>
+      <span className="cell">{children}</span>
+    </th>
+  ),
+  td: ({ children, style }) => (
+    <td style={style}>
+      <span className="cell">{children}</span>
+    </td>
+  ),
   a: ({ href, children }) => (
     <a href={href} rel="noopener noreferrer nofollow" target="_blank">
       {children}

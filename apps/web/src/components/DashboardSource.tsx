@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
-import { pinDashboardRun } from "@/app/lab/workspace-actions";
+import { pinDashboardRun, publishDashboard } from "@/app/lab/workspace-actions";
 import { fmtDate } from "@/lib/format";
 
 type RunOption = { id: string; name: string; finished_at: string | null; started_at: string };
@@ -14,12 +14,16 @@ export function DashboardSource({
   current,
   pinned,
   pinSupported,
+  isPublic,
+  publicUrl,
 }: {
   projectId: string;
   runs: RunOption[];
   current: string;
   pinned: string | null;
   pinSupported: boolean;
+  isPublic: boolean;
+  publicUrl: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,6 +48,28 @@ export function DashboardSource({
       router.replace(pathname);
       router.refresh();
     });
+
+  const [confirming, setConfirming] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const published = isPublic && isPinned;
+  const publish = (on: boolean) =>
+    start(async () => {
+      setError(null);
+      const res = await publishDashboard(projectId, current, on);
+      if (!res.ok) return setError(res.error);
+      setConfirming(false);
+      router.replace(pathname);
+      router.refresh();
+    });
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Could not copy; the link is " + publicUrl);
+    }
+  };
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -79,6 +105,40 @@ export function DashboardSource({
         </button>
       )}
       {!pinSupported && !isPinned && <span className="hint">Pinning needs migration 0006.</span>}
+      {pinSupported &&
+        (published ? (
+          <span className="flex flex-wrap items-center gap-2">
+            <a href={publicUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent/12 px-3 text-[14px] font-semibold text-accent">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
+              Public
+            </a>
+            <button type="button" onClick={copy} className="btn btn-quiet !min-h-10 !px-3 text-[14px]">
+              {copied ? "Copied" : "Copy link"}
+            </button>
+            <button type="button" onClick={() => publish(false)} disabled={pending} className="btn btn-quiet !min-h-10 !px-3 text-[14px]">
+              Unpublish
+            </button>
+          </span>
+        ) : confirming ? (
+          <span role="group" aria-label="Confirm publishing" className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface px-3 py-1.5 text-[13.5px]">
+            <span>Anyone with the link can see this run&apos;s charts, tables and text.</span>
+            <button type="button" onClick={() => publish(true)} disabled={pending} className="btn !min-h-9 !px-3 text-[14px]">
+              {pending ? "Publishing…" : "Publish"}
+            </button>
+            <button type="button" onClick={() => setConfirming(false)} className="text-muted hover:text-ink">
+              Cancel
+            </button>
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className="btn !min-h-10 !px-4 text-[14px]"
+            title="Make this run's dashboard readable by anyone with the link (it also pins the run)"
+          >
+            Publish
+          </button>
+        ))}
       {error && (
         <span role="alert" className="text-[13.5px] text-fail">
           {error}

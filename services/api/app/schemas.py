@@ -501,10 +501,49 @@ class NotebookOut(BaseModel):
 
 class DashboardUpdate(BaseModel):
     run_id: uuid.UUID | None = Field(description="A run of this project; null clears the choice")
+    is_public: bool | None = Field(
+        default=None, description="Signed-in users only: publish (needs a run) or unpublish; omit to keep"
+    )
 
 
 class DashboardOut(BaseModel):
     project_id: uuid.UUID
     run_id: uuid.UUID | None = Field(description="null: show the latest completed run with a chart")
+    is_public: bool = False
+    published_at: datetime | None = None
     updated_by: str = ""
     updated_at: datetime | None = None
+
+
+class PublicDashboardProject(BaseModel):
+    slug: str
+    name: str
+    category: str
+
+
+class PublicDashboardRun(BaseModel):
+    name: str
+    status: str
+    params: dict[str, Any]
+    tags: list[str]
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class PublicDashboardArtifact(BaseModel):
+    id: uuid.UUID
+    name: str
+    kind: str
+    description: str | None
+    preview: ArtifactPreview | None = None
+    error: str | None = None
+
+
+class PublicDashboardOut(BaseModel):
+    """A published dashboard: the pinned run's metrics and file previews. No downloads, no owner."""
+
+    project: PublicDashboardProject
+    run: PublicDashboardRun
+    metrics: list[MetricOut]
+    artifacts: list[PublicDashboardArtifact]
+    published_at: datetime | None

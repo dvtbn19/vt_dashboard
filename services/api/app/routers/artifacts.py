@@ -239,19 +239,11 @@ def _sanitize_figure(fig: dict[str, Any]) -> dict[str, Any]:
     return {"data": fig.get("data", []), "layout": layout}
 
 
-@router.get("/artifacts/{artifact_id}/preview", response_model=ArtifactPreview)
-def preview_artifact(
-    artifact_id: uuid.UUID,
-    principal: CurrentPrincipal,
-    db: DbSession,
-    settings: AppSettings,
-    storage: StorageDep,
-    rows: int = Query(default=0, ge=0, le=500),
-) -> ArtifactPreview:
-    """Bounded, parsed preview for the UI. Never returns raw HTML or executes content."""
-    principal.require_scope(SCOPE_READ)
-    artifact = get_artifact_for(db, principal, artifact_id)
-    _ready(artifact)
+def build_preview(artifact: Artifact, settings: Any, storage: Storage, rows: int = 0) -> ArtifactPreview:
+    """Bounded, parsed preview of a ready artifact. Never returns raw HTML or executes content.
+
+    Callers check access first (the lab endpoint below, or a published dashboard).
+    """
     if artifact.kind == "image":
         signed = storage.presign_get(artifact.object_key, artifact.name, artifact.mime_type, inline=True)
         return ArtifactPreview(kind="image", url=signed.url)
@@ -285,3 +277,19 @@ def preview_artifact(
         fig = json.loads(storage.read_prefix(artifact.object_key, settings.preview_json_max_bytes))
         return ArtifactPreview(kind="plotly", figure=_sanitize_figure(fig))
     raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "No preview for this artifact type")
+
+
+@router.get("/artifacts/{artifact_id}/preview", response_model=ArtifactPreview)
+def preview_artifact(
+    artifact_id: uuid.UUID,
+    principal: CurrentPrincipal,
+    db: DbSession,
+    settings: AppSettings,
+    storage: StorageDep,
+    rows: int = Query(default=0, ge=0, le=500),
+) -> ArtifactPreview:
+    """Bounded, parsed preview for the UI. Never returns raw HTML or executes content."""
+    principal.require_scope(SCOPE_READ)
+    artifact = get_artifact_for(db, principal, artifact_id)
+    _ready(artifact)
+    return build_preview(artifact, settings, storage, rows)

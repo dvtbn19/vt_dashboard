@@ -1,4 +1,4 @@
-"""Dashboard per project: which run it shows.
+"""Dashboard per project: which run it shows, and whether it is published.
 
 Revision ID: 0006
 Revises: 0005
@@ -22,6 +22,8 @@ def upgrade() -> None:
         sa.Column("project_id", sa.Uuid(), nullable=False),
         sa.Column("run_id", sa.Uuid(), nullable=True),
         sa.Column("updated_by", sa.String(length=160), nullable=False),
+        sa.Column("is_public", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("published_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="CASCADE"),

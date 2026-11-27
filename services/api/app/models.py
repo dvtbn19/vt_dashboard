@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -208,7 +209,7 @@ class Dashboard(TimestampMixin, Base):
     """The run a project's dashboard shows (its story, charts and tables). One per project.
 
     Without a row (or after the run is deleted) the dashboard falls back to the latest completed run
-    with a chart.
+    with a chart. Only a pinned run can be published.
     """
 
     __tablename__ = "dashboards"
@@ -217,3 +218,6 @@ class Dashboard(TimestampMixin, Base):
     )
     run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"))
     updated_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+    # Published: anyone can read the pinned run's story, charts and tables at /dashboards/<slug>.
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -403,3 +405,33 @@ def test_notebook_access_control(client: TestClient, owner, other, project):
         ).status_code
         == 404
     )
+
+
+def test_dashboard_pin_run(client: TestClient, owner, other, project):
+    pid = project["id"]
+    assert client.get(f"/v1/projects/{pid}/dashboard", headers=owner).json()["run_id"] is None
+    run = client.post(f"/v1/projects/{pid}/runs", json={"name": "story"}, headers=owner).json()
+    r = client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": run["id"]}, headers=owner)
+    assert r.status_code == 200, r.text
+    assert client.get(f"/v1/projects/{pid}/dashboard", headers=owner).json()["run_id"] == run["id"]
+
+    # A run of another project cannot be pinned; strangers see nothing.
+    p2 = client.post(
+        "/v1/projects", json={"name": "P2", "slug": f"p2-{uuid.uuid4().hex[:6]}"}, headers=owner
+    ).json()
+    run2 = client.post(f"/v1/projects/{p2['id']}/runs", json={"name": "x"}, headers=owner).json()
+    assert (
+        client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": run2["id"]}, headers=owner).status_code
+        == 422
+    )
+    assert client.get(f"/v1/projects/{pid}/dashboard", headers=other).status_code == 404
+    assert (
+        client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=other).status_code == 404
+    )
+
+    # Agents need runs:write; clearing works.
+    ro = bearer(make_token(client, owner, [pid], scopes=["read"]))
+    assert client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=ro).status_code == 403
+    rw = bearer(make_token(client, owner, [pid], scopes=["read", "runs:write"]))
+    r = client.put(f"/v1/projects/{pid}/dashboard", json={"run_id": None}, headers=rw)
+    assert r.status_code == 200 and r.json()["run_id"] is None

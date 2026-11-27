@@ -14,6 +14,7 @@ from app.routers import (
     artifacts,
     auth_routes,
     credentials,
+    dashboards,
     health,
     notebooks,
     notes,
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(notes.router)
     app.include_router(queries.router)
     app.include_router(notebooks.router)
+    app.include_router(dashboards.router)
     if settings.storage_backend == "local":
         app.include_router(storage_local.router)
     return app

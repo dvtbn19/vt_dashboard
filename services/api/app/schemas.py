@@ -497,3 +497,14 @@ class NotebookOut(BaseModel):
     version: int = Field(description="0 when nothing has been saved yet")
     last_edited_by: str = ""
     updated_at: datetime | None = None
+
+
+class DashboardUpdate(BaseModel):
+    run_id: uuid.UUID | None = Field(description="A run of this project; null clears the choice")
+
+
+class DashboardOut(BaseModel):
+    project_id: uuid.UUID
+    run_id: uuid.UUID | None = Field(description="null: show the latest completed run with a chart")
+    updated_by: str = ""
+    updated_at: datetime | None = None

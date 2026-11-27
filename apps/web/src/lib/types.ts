@@ -169,3 +169,6 @@ export type QueryEngine = { configured: boolean; timeout_seconds: number; max_ro
 /** Workspace notebook: the order of SQL cells (saved queries) and Markdown cells. */
 export type NotebookCell = { type: "sql"; query_id: string } | { type: "markdown"; id: string; text: string };
 export type Notebook = { project_id: string; cells: NotebookCell[]; version: number; last_edited_by: string; updated_at: string | null };
+
+/** Which run a project's dashboard shows; null means the latest completed run with a chart. */
+export type DashboardPin = { project_id: string; run_id: string | null; updated_by: string; updated_at: string | null };

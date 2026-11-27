@@ -167,3 +167,17 @@ export async function runSavedQuery(id: string, maxRows = 1000): Promise<RunResu
     return { ok: false, error: errorText(err) };
   }
 }
+
+// ------------------------------------------------------------------ dashboard
+
+/** Show this run on the project's dashboard (null: back to the latest run with a chart). */
+export async function pinDashboardRun(projectId: string, runId: string | null): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await api(`/v1/projects/${projectId}/dashboard`, { method: "PUT", body: JSON.stringify({ run_id: runId }) });
+    revalidatePath(`/lab/projects/${projectId}/dashboard`);
+    return { ok: true };
+  } catch (err) {
+    if (isRedirect(err)) throw err;
+    return { ok: false, error: errorText(err) };
+  }
+}

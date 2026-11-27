@@ -202,3 +202,18 @@ class Notebook(TimestampMixin, Base):
     cells: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     last_edited_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)
+
+
+class Dashboard(TimestampMixin, Base):
+    """The run a project's dashboard shows (its story, charts and tables). One per project.
+
+    Without a row (or after the run is deleted) the dashboard falls back to the latest completed run
+    with a chart.
+    """
+
+    __tablename__ = "dashboards"
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("runs.id", ondelete="SET NULL"))
+    updated_by: Mapped[str] = mapped_column(String(160), default="", nullable=False)

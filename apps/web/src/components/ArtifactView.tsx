@@ -8,7 +8,7 @@ import type { Artifact, ArtifactPreview } from "@/lib/types";
 
 const KIND_LABEL: Record<string, string> = { image: "Image", csv: "Table", markdown: "Report", plotly: "Chart" };
 
-function Preview({ a, p }: { a: Artifact; p: ArtifactPreview }) {
+export function Preview({ a, p }: { a: Artifact; p: ArtifactPreview }) {
   if (p.kind === "image" && p.url) {
     // eslint-disable-next-line @next/next/no-img-element -- short-lived signed URL on the API/storage origin
     return <img src={p.url} alt={a.description || a.name} className="mx-auto max-h-[640px] w-auto max-w-full rounded-lg bg-white" loading="lazy" />;
